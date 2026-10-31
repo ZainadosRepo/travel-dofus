@@ -1,0 +1,320 @@
+/* Generated from the Dofus 3.7.11 UI theme sheets (tss_assets_all.bundle). Personal use only. */
+
+:root, [data-theme="standard"] {
+  --highlight_primary100: #f0ff4f;
+  --highlight_primary80: #f0ff4fcc;
+  --highlight_primary50: #f0ff4f80;
+  --highlight_primary25: #f0ff4f40;
+  --highlight_secondary100: #b6b3e6;
+  --highlight_secondary15: #b6b3e626;
+  --highlight_secondary25: #b6b3e640;
+  --highlight_secondary35: #b6b3e659;
+  --highlight_secondary50: #b6b3e680;
+  --highlight_secondary65: #b6b3e6a6;
+  --highlight_secondary80: #b6b3e6cc;
+  --buttons_buttonPrimary: #8ca800;
+  --buttons_buttonPrimaryHover: #8ea424cc;
+  --buttons_buttonPrimaryPressed: #cfd95ecc;
+  --buttons_buttonSecondary: #2d3053cc;
+  --buttons_buttonSecondaryHover: #50547ecc;
+  --buttons_buttonSecondaryPressed: #a4a7c7cc;
+  --background_dark100: #1b1d32;
+  --background_dark80: #1b1d32cc;
+  --background_dark97: #1b1d32f7;
+  --background_medium100: #3d405c;
+  --background_medium90: #3d405ce5;
+  --header_background: #b6b3e533;
+  --header_gradient: #b6b3e5cc;
+  --background_highlight: #4b936b;
+  --background_highlight_secondary: #fffd94cc;
+}
+
+[data-theme="bonta"] {
+  --highlight_primary100: #ffd194;
+  --highlight_primary25: #ffd19440;
+  --highlight_primary50: #ffd19480;
+  --highlight_primary80: #ffd194cc;
+  --highlight_secondary100: #c0d2e5;
+  --highlight_secondary15: #c0d2e526;
+  --highlight_secondary25: #c0d2e540;
+  --highlight_secondary35: #c0d2e559;
+  --highlight_secondary50: #c0d2e580;
+  --highlight_secondary65: #c0d2e5a6;
+  --highlight_secondary80: #c0d2e5cc;
+  --buttons_buttonPrimary: #c68c48cc;
+  --buttons_buttonPrimaryHover: #d59e5dcc;
+  --buttons_buttonPrimaryPressed: #ddbb92cc;
+  --buttons_buttonSecondary: #495260cc;
+  --buttons_buttonSecondaryHover: #6a778bcc;
+  --buttons_buttonSecondaryPressed: #828ea0cc;
+  --background_dark100: #292b33;
+  --background_dark80: #292b33cc;
+  --background_dark97: #292b33f7;
+  --background_medium100: #3e4047;
+  --background_medium90: #3e4047e5;
+  --header_background: #4c80d959;
+  --header_gradient: #8bb8fdcc;
+  --background_highlight: #5286cc;
+  --background_highlight_secondary: #c7fff5cc;
+}
+
+[data-theme="brakmar"] {
+  --highlight_primary100: #ffd194;
+  --highlight_primary25: #ffd19440;
+  --highlight_primary50: #ffd19480;
+  --highlight_primary80: #ffd194cc;
+  --highlight_secondary100: #b2aaab;
+  --highlight_secondary15: #b2aaab26;
+  --highlight_secondary25: #b2aaab40;
+  --highlight_secondary35: #b2aaab59;
+  --highlight_secondary50: #b2aaab80;
+  --highlight_secondary65: #b2aaaba6;
+  --highlight_secondary80: #b2aaabcc;
+  --buttons_buttonPrimary: #c68c48cc;
+  --buttons_buttonPrimaryHover: #d59e5dcc;
+  --buttons_buttonPrimaryPressed: #ddbb92cc;
+  --buttons_buttonSecondary: #3d3b3bcc;
+  --buttons_buttonSecondaryHover: #5b5858cc;
+  --buttons_buttonSecondaryPressed: #aaa6a6cc;
+  --background_dark100: #1f1f1f;
+  --background_dark80: #1f1f1fcc;
+  --background_dark97: #1f1f1ff7;
+  --background_medium100: #292929;
+  --background_medium90: #292929e5;
+  --header_background: #f6526d33;
+  --header_gradient: #f6526dcc;
+  --background_highlight: #cc6652;
+  --background_highlight_secondary: #ffe294cc;
+}
+
+[data-theme="tribute"] {
+  --highlight_primary100: #c9ed6e;
+  --highlight_primary25: #c9ed6e40;
+  --highlight_primary50: #c9ed6e80;
+  --highlight_primary80: #c9ed6ecc;
+  --highlight_secondary100: #b8beac;
+  --highlight_secondary15: #b8beac26;
+  --highlight_secondary25: #b8beac40;
+  --highlight_secondary35: #b8beac59;
+  --highlight_secondary50: #b8beac80;
+  --highlight_secondary65: #b8beaca6;
+  --highlight_secondary80: #b8beaccc;
+  --buttons_buttonPrimary: #8fc124cc;
+  --buttons_buttonPrimaryHover: #a4d639cc;
+  --buttons_buttonPrimaryPressed: #e6ff7bcc;
+  --buttons_buttonSecondary: #3c4034cc;
+  --buttons_buttonSecondaryHover: #565a4ecc;
+  --buttons_buttonSecondaryPressed: #a7ab9fcc;
+  --background_dark100: #22241e;
+  --background_dark80: #22241ecc;
+  --background_dark97: #22241ef7;
+  --background_medium100: #3c3e38;
+  --background_medium90: #3c3e38e5;
+  --header_background: #b7b7b733;
+  --header_gradient: #b7b7b7cc;
+  --background_highlight: #95b259;
+  --background_highlight_secondary: #edff78cc;
+}
+
+[data-theme="goldandsteel"] {
+  --highlight_primary100: #ffd194;
+  --highlight_primary25: #ffd19440;
+  --highlight_primary50: #ffd19480;
+  --highlight_primary80: #ffd194cc;
+  --highlight_secondary100: #fae8d6;
+  --highlight_secondary15: #fae8d626;
+  --highlight_secondary25: #fae8d640;
+  --highlight_secondary35: #fae8d659;
+  --highlight_secondary50: #fae8d680;
+  --highlight_secondary65: #fae8d6a6;
+  --highlight_secondary80: #fae8d6cc;
+  --buttons_buttonPrimary: #bf8040cc;
+  --buttons_buttonPrimaryHover: #d9b07ecc;
+  --buttons_buttonPrimaryPressed: #ffe6c7cc;
+  --buttons_buttonSecondary: #423b34cc;
+  --buttons_buttonSecondaryHover: #61574ccc;
+  --buttons_buttonSecondaryPressed: #aea8a3cc;
+  --background_dark100: #212121;
+  --background_dark80: #212121cc;
+  --background_dark97: #212121f7;
+  --background_medium100: #373737;
+  --background_medium90: #373737e5;
+  --header_background: #ff5e3333;
+  --header_gradient: #ffc580cc;
+  --background_highlight: #bfa34d;
+  --background_highlight_secondary: #fff378cc;
+}
+
+[data-theme="belladone"] {
+  --highlight_primary100: #deed6e;
+  --highlight_primary25: #deed6e40;
+  --highlight_primary50: #deed6e80;
+  --highlight_primary80: #deed6ecc;
+  --highlight_secondary100: #d1b8e5;
+  --highlight_secondary15: #d1b8e526;
+  --highlight_secondary25: #d1b8e540;
+  --highlight_secondary35: #d1b8e559;
+  --highlight_secondary50: #d1b8e580;
+  --highlight_secondary65: #d1b8e5a6;
+  --highlight_secondary80: #d1b8e5cc;
+  --buttons_buttonPrimary: #acc124cc;
+  --buttons_buttonPrimaryHover: #c0d728cc;
+  --buttons_buttonPrimaryPressed: #eef5c7cc;
+  --buttons_buttonSecondary: #49445ccc;
+  --buttons_buttonSecondaryHover: #58526fcc;
+  --buttons_buttonSecondaryPressed: #a9a4bccc;
+  --background_dark100: #251f2e;
+  --background_dark80: #251f2ecc;
+  --background_dark97: #251f2ef7;
+  --background_medium100: #3b3543;
+  --background_medium90: #3b3543e5;
+  --header_background: #d1b8e533;
+  --header_gradient: #d1b8e5cc;
+  --background_highlight: #a673bf;
+  --background_highlight_secondary: #dcffb1cc;
+}
+
+[data-theme="unicorn"] {
+  --highlight_primary100: #ffaded;
+  --highlight_primary25: #ffaded40;
+  --highlight_primary50: #ffaded80;
+  --highlight_primary80: #ffadedcc;
+  --highlight_secondary100: #d0b3d0;
+  --highlight_secondary15: #d0b3d026;
+  --highlight_secondary25: #d0b3d040;
+  --highlight_secondary35: #d0b3d059;
+  --highlight_secondary50: #d0b3d080;
+  --highlight_secondary65: #d0b3d0a6;
+  --highlight_secondary80: #d0b3d0cc;
+  --buttons_buttonPrimary: #d16bcbcc;
+  --buttons_buttonPrimaryHover: #e09adbcc;
+  --buttons_buttonPrimaryPressed: #f7e4f5cc;
+  --buttons_buttonSecondary: #524653cc;
+  --buttons_buttonSecondaryHover: #655666cc;
+  --buttons_buttonSecondaryPressed: #b1a4b2cc;
+  --background_dark100: #262222;
+  --background_dark80: #262222cc;
+  --background_dark97: #262222f7;
+  --background_medium100: #3c3838;
+  --background_medium90: #3c3838e5;
+  --header_background: #e087e333;
+  --header_gradient: #e087e3cc;
+  --background_highlight: #bf608f;
+  --background_highlight_secondary: #fffac2cc;
+}
+
+[data-theme="emeraldmine"] {
+  --highlight_primary100: #96f8d6;
+  --highlight_primary25: #96f8d640;
+  --highlight_primary50: #96f8d680;
+  --highlight_primary80: #96f8d6cc;
+  --highlight_secondary100: #b4d6d9;
+  --highlight_secondary15: #b4d6d926;
+  --highlight_secondary25: #b4d6d940;
+  --highlight_secondary35: #b4d6d959;
+  --highlight_secondary50: #b4d6d980;
+  --highlight_secondary65: #b4d6d9a6;
+  --highlight_secondary80: #b4d6d9cc;
+  --buttons_buttonPrimary: #2cb08dcc;
+  --buttons_buttonPrimaryHover: #6cdabdcc;
+  --buttons_buttonPrimaryPressed: #d6f5edcc;
+  --buttons_buttonSecondary: #2b3634cc;
+  --buttons_buttonSecondaryHover: #4a5e5acc;
+  --buttons_buttonSecondaryPressed: #9bb0accc;
+  --background_dark100: #1f2625;
+  --background_dark80: #1f2625cc;
+  --background_dark97: #1f2625f7;
+  --background_medium100: #292f3b;
+  --background_medium90: #292f3be5;
+  --header_background: #89d2d933;
+  --header_gradient: #89d2d9cc;
+  --background_highlight: #73bfa6;
+  --background_highlight_secondary: #d5ffedcc;
+}
+
+[data-theme="sufokia"] {
+  --highlight_primary100: #fff194;
+  --highlight_primary25: #fff19440;
+  --highlight_primary50: #fff19480;
+  --highlight_primary80: #fff194cc;
+  --highlight_secondary100: #c0d2e5;
+  --highlight_secondary15: #c0d2e526;
+  --highlight_secondary25: #c0d2e540;
+  --highlight_secondary35: #c0d2e559;
+  --highlight_secondary50: #c0d2e580;
+  --highlight_secondary65: #c0d2e5a6;
+  --highlight_secondary80: #c0d2e5cc;
+  --buttons_buttonPrimary: #cda63ccc;
+  --buttons_buttonPrimaryHover: #e3c759cc;
+  --buttons_buttonPrimaryPressed: #fce99ecc;
+  --buttons_buttonSecondary: #495260cc;
+  --buttons_buttonSecondaryHover: #6a778bcc;
+  --buttons_buttonSecondaryPressed: #828ea0cc;
+  --background_dark100: #292b33;
+  --background_dark80: #292b33cc;
+  --background_dark97: #292b33f7;
+  --background_medium100: #3e4047;
+  --background_medium90: #3e4047e5;
+  --header_background: #5ebcb933;
+  --header_gradient: #5ebcb9cc;
+  --background_highlight: #52aecc;
+  --background_highlight_secondary: #fbffb8cc;
+}
+
+[data-theme="pandala"] {
+  --highlight_primary100: #fff194;
+  --highlight_primary25: #fff19440;
+  --highlight_primary50: #fff19480;
+  --highlight_primary80: #fff194cc;
+  --highlight_secondary100: #fae8d6;
+  --highlight_secondary15: #fae8d626;
+  --highlight_secondary25: #fae8d640;
+  --highlight_secondary35: #fae8d659;
+  --highlight_secondary50: #fae8d680;
+  --highlight_secondary65: #fae8d6a6;
+  --highlight_secondary80: #fae8d6cc;
+  --buttons_buttonPrimary: #8fc124cc;
+  --buttons_buttonPrimaryHover: #a4d639cc;
+  --buttons_buttonPrimaryPressed: #e6ff7bcc;
+  --buttons_buttonSecondary: #423b34cc;
+  --buttons_buttonSecondaryHover: #61574ccc;
+  --buttons_buttonSecondaryPressed: #aea8a3cc;
+  --background_dark100: #212121;
+  --background_dark80: #212121cc;
+  --background_dark97: #212121f7;
+  --background_medium100: #373737;
+  --background_medium90: #373737e5;
+  --header_background: #549a104d;
+  --header_gradient: #bae080cc;
+  --background_highlight: #a5bf56;
+  --background_highlight_secondary: #e4ff72cc;
+}
+
+[data-theme="wabbit"] {
+  --highlight_primary100: #c9ed6e;
+  --highlight_primary25: #c9ed6e40;
+  --highlight_primary50: #c9ed6e80;
+  --highlight_primary80: #c9ed6ecc;
+  --highlight_secondary100: #c1b6a4;
+  --highlight_secondary15: #c1b6a426;
+  --highlight_secondary25: #c1b6a440;
+  --highlight_secondary35: #c1b6a459;
+  --highlight_secondary50: #c1b6a480;
+  --highlight_secondary65: #c1b6a4a6;
+  --highlight_secondary80: #c1b6a4cc;
+  --buttons_buttonPrimary: #8fc124cc;
+  --buttons_buttonPrimaryHover: #a4d639cc;
+  --buttons_buttonPrimaryPressed: #e6ff7bcc;
+  --buttons_buttonSecondary: #3c4034cc;
+  --buttons_buttonSecondaryHover: #565a4ecc;
+  --buttons_buttonSecondaryPressed: #a7ab9fcc;
+  --background_dark100: #24221e;
+  --background_dark80: #24221ecc;
+  --background_dark97: #24221ef7;
+  --background_medium100: #3e3c38;
+  --background_medium90: #3e3c38e5;
+  --header_background: #ff421e80;
+  --header_gradient: #f99d71cc;
+  --background_highlight: #79a040;
+  --background_highlight_secondary: #ffc27dcc;
+}

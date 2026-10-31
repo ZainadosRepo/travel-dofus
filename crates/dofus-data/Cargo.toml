@@ -1,0 +1,17 @@
+[package]
+name = "dofus-data"
+version = "0.1.0"
+description = "Reads Dofus 3 game data (Unity bundles, texts) and answers NPC/zaap searches and routes"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "extract"
+path = "src/bin/extract.rs"
+
+[dependencies]
+lz4_flex = "0.14"
+lzma-rs = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+unicode-normalization = "0.1"
