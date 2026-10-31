@@ -555,7 +555,8 @@ $("minimize").addEventListener("click", () => appWindow.minimize());
 async function showStatus() {
   try {
     const s = await invoke("data_status");
-    els.footer.textContent = `Données Dofus ${s.dataVersion} · ${s.npcs} PNJ · ${s.zaaps} zaaps · ${s.markers} repères`;
+    els.footer.textContent = `Dofus ${s.dataVersion} · ${s.npcs} PNJ · ${s.zaaps} zaaps · ${s.markers} repères`;
+    els.footer.title = els.footer.textContent;
     if (s.installedVersion && s.installedVersion !== s.dataVersion) {
       els.banner.textContent = `Dofus est en ${s.installedVersion}, les données datent de ${s.dataVersion} : relance l'extraction.`;
       els.banner.hidden = false;

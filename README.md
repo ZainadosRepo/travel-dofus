@@ -5,7 +5,7 @@
 
 Petite fenêtre toujours au-dessus de Dofus 3 : on cherche un PNJ, une zone, un zaap, un repère de la carte (banque, atelier…) ou une position `x,y`, et l'appli copie le trajet le plus court (`/zaap x,y` répété par l'anti lag, puis `/travel x,y`). Avec « Ma position », elle compare la marche directe et le passage par un zaap.
 
-Les données (2 080 PNJ placés par les quêtes, 47 zaaps, 834 repères, 15 409 cartes et leurs liaisons, noms dans les 5 langues du jeu) sont extraites des fichiers du client et embarquées dans l'appli : aucune connexion n'est nécessaire. L'interface reprend les 11 thèmes et la police (Lexend) de Dofus 3.
+Les données (2 080 PNJ placés par les quêtes, 47 zaaps, 834 repères, 15 409 cartes et le graphe de déplacement du jeu, noms dans les 5 langues) sont extraites des fichiers du client et embarquées dans l'appli : aucune connexion n'est nécessaire. L'interface reprend les 11 thèmes et la police (Lexend) de Dofus 3.
 
 ## Télécharger
 
@@ -33,12 +33,14 @@ Télécharger la nouvelle version et l'installer par-dessus l'ancienne. Les prof
 
 ## Utilisation
 
-1. Ouvrir Travel Dofus à côté du jeu : la fenêtre reste au-dessus de Dofus.
+1. Ouvrir Travel Dofus à côté du jeu : la fenêtre, de la taille d'un panneau du jeu, reste au-dessus de Dofus. La glisser par son titre et la redimensionner par ses bords pour la caser dans l'interface.
 2. Taper un nom de PNJ, de zone, de zaap ou de repère (accents et majuscules ignorés), ou une position comme `4,-18`.
 3. Appuyer sur **Entrée** (ou cliquer sur le résultat) : le trajet est copié.
 4. Dans Dofus, coller dans le chat (**Ctrl + V**) et valider.
 
 Pour comparer la marche et le zaap, indiquer sa position actuelle dans **Ma position**.
+
+Les distances suivent le graphe de déplacement du jeu : passages réels entre cartes, sens unique, murs et rivières qui coupent une carte. Elles sont comptées en cartes traversées. « Accès sous condition » signale un trajet qui passe par un accès réservé (quête, objet ou autre condition du jeu), comme pour une autre dimension ou certaines îles ; il n'est proposé que si aucun chemin libre n'existe.
 
 | Action | Comment |
 | --- | --- |
@@ -92,7 +94,7 @@ node --test "tests/ui/*.test.js"
 cargo run --release -p dofus-data --bin extract
 ```
 
-Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json` (~20 s).
+Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json` (quelques secondes).
 
 ### Publier une version
 
