@@ -149,6 +149,7 @@ impl Searcher {
                     zaap_steps: None,
                     walk_steps: None,
                     take_zaap: false,
+                    gated: false,
                 },
                 |m| atlas.plan(m, distances.as_deref(), lang),
             )

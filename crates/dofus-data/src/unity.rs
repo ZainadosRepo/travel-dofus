@@ -482,24 +482,6 @@ impl<'a> SerializedFile<'a> {
         };
         v.read(self.tree(o))
     }
-
-    /// Reads fields in order up to and including the first one named `last`, descending into the
-    /// struct that holds it, without decoding anything after it.
-    pub fn read_fields_until(&self, o: &ObjectInfo, last: &str) -> Result<Map<String, Value>> {
-        let mut v = ValueReader {
-            r: Reader::new(&self.data[o.start..o.start + o.size], 0),
-            refs: &self.ref_types,
-        };
-        let mut out = Map::new();
-        v.read_until(self.tree(o), last, &mut out)?;
-        Ok(out)
-    }
-}
-
-fn holds_field(node: &TypeNode, name: &str) -> bool {
-    node.children
-        .iter()
-        .any(|c| c.name == name || (c.ty != "Array" && holds_field(c, name)))
 }
 
 struct ValueReader<'a, 'r> {
@@ -508,32 +490,6 @@ struct ValueReader<'a, 'r> {
 }
 
 impl ValueReader<'_, '_> {
-    /// Returns true once `last` was read.
-    fn read_until(
-        &mut self,
-        node: &TypeNode,
-        last: &str,
-        out: &mut Map<String, Value>,
-    ) -> Result<bool> {
-        for child in &node.children {
-            if child.name == last {
-                out.insert(child.name.clone(), self.read(child)?);
-                return Ok(true);
-            }
-            if child.ty != "Array" && holds_field(child, last) {
-                let mut inner = Map::new();
-                let done = self.read_until(child, last, &mut inner)?;
-                out.insert(child.name.clone(), Value::Object(inner));
-                if done {
-                    return Ok(true);
-                }
-                continue;
-            }
-            out.insert(child.name.clone(), self.read(child)?);
-        }
-        Ok(false)
-    }
-
     fn read(&mut self, node: &TypeNode) -> Result<Value> {
         let r = &mut self.r;
         let v = match node.ty.as_str() {

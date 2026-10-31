@@ -50,6 +50,19 @@ fn every_npc_has_names_in_all_five_languages() {
 }
 
 #[test]
+fn islands_are_not_reached_across_the_water() {
+    let a = atlas();
+    let hits = Searcher::new(&a).search(&a, "wabbit du soiw woulant", None, Lang::Fr);
+    let wabbit = hits.first().expect("Wabbit du Soiw Woulant");
+    // Linking maps by coordinates put it 4 maps from another zaap, across the water.
+    assert_eq!(
+        wabbit.plan.zaap.as_ref().map(|z| z.map_id),
+        Some(115_737_095)
+    );
+    assert_eq!(wabbit.plan.zaap_steps, Some(29));
+}
+
+#[test]
 fn walking_beats_the_zaap_next_door() {
     let a = atlas();
     let hits = Searcher::new(&a).search(&a, "3,1", Some((3, 2)), Lang::Fr);

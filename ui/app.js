@@ -5,7 +5,7 @@ const { invoke } = window.__TAURI__.core;
 const appWindow = window.__TAURI__.window.getCurrentWindow();
 
 const KIND_LABEL = { coords: "Position", zaap: "Zaap", npc: "PNJ", marker: "Repère", custom: "Perso" };
-const EMPTY_PLAN = { zaap: null, zaapSteps: null, walkSteps: null, takeZaap: false };
+const EMPTY_PLAN = { zaap: null, zaapSteps: null, walkSteps: null, takeZaap: false, gated: false };
 const COORDS = /^\s*\[?\s*(-?\d+)\s*[,; ]\s*(-?\d+)\s*\]?\s*$/;
 
 const $ = (id) => document.getElementById(id);
@@ -164,12 +164,13 @@ function scheduleSearch() {
 
 function routeText(place) {
   const forced = fixOf(place)?.zaap;
-  const { zaap, zaapSteps, walkSteps, takeZaap } = place.plan;
+  const { zaap, zaapSteps, walkSteps, takeZaap, gated } = place.plan;
   if (forced) return `Zaap ${forced.name} [${forced.x},${forced.y}] (choisi)`;
+  const gate = gated ? " · accès sous condition" : "";
   if (takeZaap && zaap) {
-    return zaapSteps === 0 ? `Sur le zaap ${zaap.name}` : `Zaap ${zaap.name} [${zaap.x},${zaap.y}] · ${steps(zaapSteps)}`;
+    return zaapSteps === 0 ? `Sur le zaap ${zaap.name}` : `Zaap ${zaap.name} [${zaap.x},${zaap.y}] · ${steps(zaapSteps)}${gate}`;
   }
-  if (walkSteps != null) return `À pied : ${steps(walkSteps)}${zaap ? ` · zaap à ${steps(zaapSteps)}` : ""}`;
+  if (walkSteps != null) return `À pied : ${steps(walkSteps)}${gate}${zaap ? ` · zaap à ${steps(zaapSteps)}` : ""}`;
   return "Aucun zaap relié";
 }
 

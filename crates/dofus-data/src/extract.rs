@@ -2,7 +2,7 @@
 
 use crate::i18n::Texts;
 use crate::unity::{read_bundle, SerializedFile, MONO_BEHAVIOUR};
-use crate::world::{Lang, MapInfo, Marker, Names, Npc, SubArea, World};
+use crate::world::{Exit, Lang, MapInfo, Marker, Names, Npc, SubArea, World};
 use crate::{err, Result};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -72,60 +72,59 @@ fn int(v: &Value, key: &str) -> i64 {
     v.get(key).and_then(Value::as_i64).unwrap_or_default()
 }
 
-/// Walking links between maps, from the map bundles: `(map id, [top, bottom, left, right])`.
-fn map_neighbours(game: &Path) -> Result<HashMap<i64, Vec<i64>>> {
-    let dir = content(game).join("Map").join("Data");
-    let mut out = HashMap::new();
-    for entry in fs::read_dir(&dir)? {
-        let path = entry?.path();
-        let is_map = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.starts_with("mapdata_assets_world_"));
-        if !is_map {
+/// Moves between map zones, from the `world-graph` object the client routes `/travel` with.
+fn world_graph(game: &Path) -> Result<HashMap<i64, Vec<Exit>>> {
+    let aa = game.join("Dofus_Data").join("StreamingAssets").join("aa");
+    // One platform folder per install (StandaloneWindows64, StandaloneOSX…).
+    let Some(path) = fs::read_dir(&aa)?
+        .filter_map(|e| e.ok())
+        .map(|e| e.path().join("worldassets_assets_all.bundle"))
+        .find(|p| p.is_file())
+    else {
+        return err(format!(
+            "{}: no worldassets_assets_all.bundle",
+            aa.display()
+        ));
+    };
+    let context = |e: crate::Error| crate::Error(format!("{}: {e}", path.display()));
+    let bytes = fs::read(&path)?;
+    for file in read_bundle(&bytes).map_err(context)? {
+        let Ok(sf) = SerializedFile::parse(&file.data) else {
             continue;
-        }
-        let context = |e: crate::Error| crate::Error(format!("{}: {e}", path.display()));
-        let bytes = fs::read(&path)?;
-        for file in read_bundle(&bytes).map_err(context)? {
-            let Ok(sf) = SerializedFile::parse(&file.data) else {
+        };
+        for o in &sf.objects {
+            let is_graph = sf.class_id(o) == MONO_BEHAVIOUR
+                && sf.tree(o).children.iter().any(|c| c.name == "m_edges");
+            if !is_graph {
                 continue;
-            };
-            for o in &sf.objects {
-                if sf.class_id(o) != MONO_BEHAVIOUR {
-                    continue;
-                }
-                let f = sf
-                    .read_fields_until(o, "rightNeighbourId")
-                    .map_err(context)?;
-                // Two layouts ship side by side: fields at the top level with an `id`, or nested in
-                // `mapData` with the id only in the object name (`map_<id>`).
-                let from_name = || {
-                    f.get("m_Name")?
-                        .as_str()?
-                        .strip_prefix("map_")?
-                        .parse()
-                        .ok()
-                };
-                let Some(id) = f.get("id").and_then(Value::as_i64).or_else(from_name) else {
-                    continue;
-                };
-                let f = f.get("mapData").and_then(Value::as_object).unwrap_or(&f);
-                let n = [
-                    "topNeighbourId",
-                    "bottomNeighbourId",
-                    "leftNeighbourId",
-                    "rightNeighbourId",
-                ]
-                .iter()
-                .filter_map(|k| f.get(*k).and_then(Value::as_i64))
-                .filter(|&m| m > 0)
-                .collect();
-                out.insert(id, n);
             }
+            let graph = sf.read(o).map_err(context)?;
+            let Some(groups) = graph.pointer("/m_edges/m_values").and_then(Value::as_array) else {
+                return err("world-graph: no m_edges");
+            };
+            let mut out: HashMap<i64, Vec<Exit>> = HashMap::new();
+            for e in groups
+                .iter()
+                .filter_map(|g| g["m_values"].as_array())
+                .flatten()
+            {
+                let (from, to) = (&e["m_from"], &e["m_to"]);
+                // An edge with any unconditioned transition is open to everyone.
+                let gated = e["m_transitions"].as_array().is_some_and(|t| {
+                    t.iter()
+                        .all(|t| t["m_criterion"].as_str().is_some_and(|c| !c.is_empty()))
+                });
+                out.entry(int(from, "m_mapId")).or_default().push(Exit(
+                    int(from, "m_zoneId") as u8,
+                    int(to, "m_mapId"),
+                    int(to, "m_zoneId") as u8,
+                    gated,
+                ));
+            }
+            return Ok(out);
         }
     }
-    Ok(out)
+    err("no world-graph object")
 }
 
 pub fn extract(game: &Path) -> Result<World> {
@@ -144,31 +143,21 @@ pub fn extract(game: &Path) -> Result<World> {
         Names { fr, en, de, es, pt }
     };
 
-    let mut neighbours = map_neighbours(game)?;
-    for row in table(game, "mapscrollactions")? {
-        let id = int(&row, "id");
-        for side in ["top", "bottom", "left", "right"] {
-            let target = int(&row, &format!("{side}MapId"));
-            if int(&row, &format!("{side}Exists")) != 0 && target > 0 {
-                neighbours.entry(id).or_default().push(target);
-            }
-        }
-    }
-
+    let mut graph = world_graph(game)?;
     let maps: Vec<MapInfo> = table(game, "mapsinformation")?
         .iter()
         .map(|m| {
             let id = int(m, "id");
-            let mut n = neighbours.remove(&id).unwrap_or_default();
-            n.sort_unstable();
-            n.dedup();
+            let mut exits = graph.remove(&id).unwrap_or_default();
+            exits.sort_unstable_by_key(|e| (e.0, e.1, e.2, e.3));
+            exits.dedup();
             MapInfo {
                 id,
                 x: int(m, "posX") as i32,
                 y: int(m, "posY") as i32,
                 world_map: int(m, "worldMap") as i32,
                 sub_area: int(m, "subAreaId"),
-                neighbours: n,
+                exits,
             }
         })
         .collect();
@@ -274,13 +263,6 @@ mod tests {
         let world = extract(&game).unwrap();
         assert!(world.zaaps.contains(&191_105_026), "Astrub zaap");
         assert!(world.npcs.len() > 1000);
-        assert!(
-            world
-                .maps
-                .iter()
-                .filter(|m| !m.neighbours.is_empty())
-                .count()
-                > 10_000
-        );
+        assert!(world.maps.iter().filter(|m| !m.exits.is_empty()).count() > 10_000);
     }
 }

@@ -30,11 +30,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let linked = world
-        .maps
-        .iter()
-        .filter(|m| !m.neighbours.is_empty())
-        .count();
+    let linked = world.maps.iter().filter(|m| !m.exits.is_empty()).count();
     let json = serde_json::to_string(&world).expect("world serializes");
     if let Err(e) = std::fs::write(&out, json) {
         eprintln!("cannot write {}: {e}", out.display());

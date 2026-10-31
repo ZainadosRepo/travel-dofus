@@ -1,13 +1,17 @@
-//! Walking graph between maps and the zaap-or-walk plan to reach a map.
+//! Walking graph between map zones and the zaap-or-walk plan to reach a map.
 
 use crate::world::{Lang, MapInfo, Names, World};
 use serde::Serialize;
-use std::collections::{HashMap, VecDeque};
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap};
 
 /// Surface world map, the one `/travel` coordinates refer to.
 const SURFACE: i32 = 1;
 /// shortcut: a zaap hop is priced as a fixed number of walked maps (loading + click), tune if routes feel off.
 const ZAAP_COST: u32 = 5;
+/// Added to a path's cost for each gated move, so a path anyone can walk always wins; the low bits
+/// still count the maps walked.
+const GATE: u32 = 1 << 16;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -30,32 +34,46 @@ pub struct Plan {
     pub walk_steps: Option<u32>,
     /// Whether going through the zaap beats walking from the start position.
     pub take_zaap: bool,
+    /// Whether the chosen route needs a gated move (quest, item…): other dimensions, islands…
+    pub gated: bool,
 }
 
 pub struct Atlas {
     pub world: World,
     index: HashMap<i64, usize>,
-    adjacency: Vec<Vec<usize>>,
+    /// Graph vertices (walkable zones) of each map; empty for maps the world graph leaves out.
+    zones: Vec<Vec<usize>>,
+    /// Per vertex: `(next vertex, cost)`.
+    adjacency: Vec<Vec<(usize, u32)>>,
+    /// Per vertex: `(zaap map index, cost)` of the cheapest zaap leading there.
     nearest_zaap: Vec<Option<(usize, u32)>>,
     surface_at: HashMap<(i32, i32), usize>,
     sub_area_names: HashMap<i64, Names>,
 }
 
-fn bfs(adjacency: &[Vec<usize>], sources: &[usize]) -> Vec<Option<(usize, u32)>> {
-    let mut best = vec![None; adjacency.len()];
-    let mut queue = VecDeque::new();
-    for &s in sources {
-        if best[s].is_none() {
-            best[s] = Some((s, 0));
-            queue.push_back(s);
+/// Cheapest cost from `sources` (`(vertex, origin)`) to every vertex, with the origin it came from.
+fn shortest(
+    adjacency: &[Vec<(usize, u32)>],
+    sources: &[(usize, usize)],
+) -> Vec<Option<(usize, u32)>> {
+    let mut best: Vec<Option<(usize, u32)>> = vec![None; adjacency.len()];
+    let mut heap = BinaryHeap::new();
+    for &(v, origin) in sources {
+        if best[v].is_none() {
+            best[v] = Some((origin, 0));
+            heap.push(Reverse((0, v)));
         }
     }
-    while let Some(m) = queue.pop_front() {
-        let (origin, d) = best[m].expect("queued maps are reached");
-        for &n in &adjacency[m] {
-            if best[n].is_none() {
-                best[n] = Some((origin, d + 1));
-                queue.push_back(n);
+    while let Some(Reverse((cost, v))) = heap.pop() {
+        let (origin, known) = best[v].expect("queued vertices are reached");
+        if cost > known {
+            continue;
+        }
+        for &(n, step) in &adjacency[v] {
+            let c = cost + step;
+            if best[n].is_none_or(|(_, k)| c < k) {
+                best[n] = Some((origin, c));
+                heap.push(Reverse((c, n)));
             }
         }
     }
@@ -70,13 +88,30 @@ impl Atlas {
             .enumerate()
             .map(|(i, m)| (m.id, i))
             .collect();
-        // Map edges are stored one way; walking works both ways.
-        let mut adjacency = vec![Vec::new(); world.maps.len()];
+        let mut vertex: HashMap<(usize, u8), usize> = HashMap::new();
+        let mut zones = vec![Vec::new(); world.maps.len()];
+        let mut adjacency: Vec<Vec<(usize, u32)>> = Vec::new();
+        let mut vertex_of = |map: usize, zone: u8, adjacency: &mut Vec<Vec<(usize, u32)>>| {
+            *vertex.entry((map, zone)).or_insert_with(|| {
+                adjacency.push(Vec::new());
+                zones[map].push(adjacency.len() - 1);
+                adjacency.len() - 1
+            })
+        };
         for (i, m) in world.maps.iter().enumerate() {
-            for n in m.neighbours.iter().filter_map(|n| index.get(n)) {
-                adjacency[i].push(*n);
-                adjacency[*n].push(i);
+            for e in &m.exits {
+                let Some(&to) = index.get(&e.1) else {
+                    continue;
+                };
+                let from = vertex_of(i, e.0, &mut adjacency);
+                let to = vertex_of(to, e.2, &mut adjacency);
+                adjacency[from].push((to, if e.3 { GATE + 1 } else { 1 }));
             }
+        }
+        for list in &mut adjacency {
+            // Keep the cheapest of duplicate moves.
+            list.sort_unstable();
+            list.dedup_by_key(|(to, _)| *to);
         }
         let mut surface_at: HashMap<(i32, i32), usize> = HashMap::new();
         for (i, m) in world
@@ -88,35 +123,18 @@ impl Atlas {
             // Several maps can share coordinates; the best connected one is the outdoor map.
             let better = surface_at
                 .get(&(m.x, m.y))
-                .is_none_or(|&j| adjacency[i].len() > adjacency[j].len());
+                .is_none_or(|&j| m.exits.len() > world.maps[j].exits.len());
             if better {
                 surface_at.insert((m.x, m.y), i);
             }
         }
-        // About 2 200 surface maps list neighbour ids that exist nowhere in the client; link those by
-        // coordinates instead so they still reach a zaap.
-        let isolated: Vec<usize> = (0..world.maps.len())
-            .filter(|&i| world.maps[i].world_map == SURFACE && adjacency[i].is_empty())
-            .collect();
-        for i in isolated {
-            let m = &world.maps[i];
-            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                if let Some(&n) = surface_at.get(&(m.x + dx, m.y + dy)) {
-                    adjacency[i].push(n);
-                    adjacency[n].push(i);
-                }
-            }
-        }
-        for list in &mut adjacency {
-            list.sort_unstable();
-            list.dedup();
-        }
-        let zaaps: Vec<usize> = world
+        let zaaps: Vec<(usize, usize)> = world
             .zaaps
             .iter()
-            .filter_map(|z| index.get(z).copied())
+            .filter_map(|z| index.get(z))
+            .flat_map(|&m| zones[m].iter().map(move |&v| (v, m)))
             .collect();
-        let nearest_zaap = bfs(&adjacency, &zaaps);
+        let nearest_zaap = shortest(&adjacency, &zaaps);
         let sub_area_names = world
             .sub_areas
             .iter()
@@ -125,6 +143,7 @@ impl Atlas {
         Atlas {
             world,
             index,
+            zones,
             adjacency,
             nearest_zaap,
             surface_at,
@@ -148,13 +167,18 @@ impl Atlas {
         self.surface_at.get(&(x, y)).map(|&i| &self.world.maps[i])
     }
 
-    /// Walking distances from one map to every other, for comparing against a zaap.
+    /// Walking costs from one map to every vertex, for comparing against a zaap.
     pub fn distances_from(&self, map_id: i64) -> Option<Vec<Option<u32>>> {
         let start = *self.index.get(&map_id)?;
+        // The zone the player stands in is unknown: any zone of the map may start the walk.
+        let sources: Vec<(usize, usize)> = self.zones[start].iter().map(|&v| (v, start)).collect();
+        if sources.is_empty() {
+            return None;
+        }
         Some(
-            bfs(&self.adjacency, &[start])
+            shortest(&self.adjacency, &sources)
                 .into_iter()
-                .map(|b| b.map(|(_, d)| d))
+                .map(|b| b.map(|(_, c)| c))
                 .collect(),
         )
     }
@@ -182,28 +206,37 @@ impl Atlas {
     }
 
     pub fn plan(&self, target: &MapInfo, from: Option<&[Option<u32>]>, lang: Lang) -> Plan {
-        let i = self.index[&target.id];
-        // Interiors are entered through a door: route to the surface map at the same coordinates.
-        let i = match target.world_map {
-            SURFACE => i,
-            _ => self
+        let mut i = self.index[&target.id];
+        // A map the world graph leaves out is reached through the surface map at its coordinates.
+        if self.zones[i].is_empty() {
+            i = self
                 .surface_at
                 .get(&(target.x, target.y))
                 .copied()
-                .unwrap_or(i),
-        };
-        let walk_steps = from.and_then(|d| d[i]);
-        let zaap = self.nearest_zaap[i];
-        let take_zaap = match (zaap, walk_steps) {
-            (Some((_, d)), Some(w)) => d + ZAAP_COST < w,
+                .unwrap_or(i);
+        }
+        let zones = &self.zones[i];
+        let zaap = zones
+            .iter()
+            .filter_map(|&v| self.nearest_zaap[v])
+            .min_by_key(|&(_, c)| c);
+        let walk = from.and_then(|d| zones.iter().filter_map(|&v| d[v]).min());
+        let take_zaap = match (zaap, walk) {
+            (Some((_, z)), Some(w)) => z + ZAAP_COST < w,
             (Some(_), None) => true,
             (None, _) => false,
         };
+        let chosen = if take_zaap {
+            zaap.map(|(_, c)| c)
+        } else {
+            walk
+        };
         Plan {
             zaap: zaap.map(|(z, _)| self.stop(&self.world.maps[z], lang)),
-            zaap_steps: zaap.map(|(_, d)| d),
-            walk_steps,
+            zaap_steps: zaap.map(|(_, c)| c % GATE),
+            walk_steps: walk.map(|c| c % GATE),
             take_zaap,
+            gated: chosen.is_some_and(|c| c >= GATE),
         }
     }
 
@@ -222,7 +255,7 @@ impl Atlas {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::world::SubArea;
+    use crate::world::{Exit, SubArea};
 
     pub(crate) fn names(fr: &str) -> Names {
         Names {
@@ -231,16 +264,29 @@ pub(crate) mod tests {
         }
     }
 
-    /// Eight surface maps in a row at y = 0, x = 0..7, each linked to the next; zaap on x = 0.
+    fn map(id: i64, x: i32, exits: Vec<Exit>) -> MapInfo {
+        MapInfo {
+            id,
+            x,
+            y: 0,
+            world_map: SURFACE,
+            sub_area: 1,
+            exits,
+        }
+    }
+
+    /// Eight surface maps in a row at y = 0, x = 0..7, linked both ways; zaap on x = 0.
     pub(crate) fn line_world() -> World {
         let maps = (0..8)
-            .map(|x| MapInfo {
-                id: 100 + x,
-                x: x as i32,
-                y: 0,
-                world_map: SURFACE,
-                sub_area: 1,
-                neighbours: if x < 7 { vec![101 + x] } else { vec![] },
+            .map(|x| {
+                let mut exits = Vec::new();
+                if x > 0 {
+                    exits.push(Exit(1, 99 + x, 1, false));
+                }
+                if x < 7 {
+                    exits.push(Exit(1, 101 + x, 1, false));
+                }
+                map(100 + x, x as i32, exits)
             })
             .collect();
         World {
@@ -255,6 +301,12 @@ pub(crate) mod tests {
             npcs: vec![],
             markers: vec![],
         }
+    }
+
+    fn steps_to(atlas: &Atlas, id: i64) -> Option<u32> {
+        atlas
+            .plan(atlas.map(id).unwrap(), None, Lang::Fr)
+            .zaap_steps
     }
 
     #[test]
@@ -284,43 +336,54 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn isolated_map_is_linked_by_coordinates() {
+    fn one_way_moves_are_not_walked_back() {
         let mut w = line_world();
-        w.maps.push(MapInfo {
-            id: 200,
-            x: 8,
-            y: 0,
-            world_map: SURFACE,
-            sub_area: 1,
-            neighbours: vec![999],
-        });
+        // A drop from 200 lands on 107, with no way up.
+        w.maps.push(map(200, 8, vec![Exit(1, 107, 1, false)]));
         let atlas = Atlas::new(w);
+        assert_eq!(steps_to(&atlas, 200), None);
+    }
+
+    #[test]
+    fn a_wall_splits_a_map_into_zones() {
+        let mut w = line_world();
+        w.maps[7].exits.push(Exit(1, 108, 1, false));
+        w.maps.push(map(108, 8, vec![Exit(1, 107, 1, false)]));
+        // Zone 2 of 108 only opens onto 109.
+        w.maps[8].exits.push(Exit(2, 109, 1, false));
+        w.maps.push(map(109, 9, vec![Exit(1, 108, 2, false)]));
+        let atlas = Atlas::new(w);
+        assert_eq!(steps_to(&atlas, 108), Some(8));
         assert_eq!(
-            atlas
-                .plan(atlas.map(200).unwrap(), None, Lang::Fr)
-                .zaap_steps,
-            Some(8)
+            steps_to(&atlas, 109),
+            None,
+            "no crossing from zone 1 to zone 2"
         );
     }
 
     #[test]
-    fn interior_is_routed_through_the_surface_map() {
+    fn gated_moves_only_when_nothing_else_reaches() {
+        let mut w = line_world();
+        // A gated shortcut from the zaap to 107, and a dead end only reached through a gate.
+        w.maps[0].exits.push(Exit(1, 107, 1, true));
+        w.maps[0].exits.push(Exit(1, 300, 1, true));
+        w.maps.push(map(300, -1, vec![]));
+        let atlas = Atlas::new(w);
+        assert_eq!(steps_to(&atlas, 107), Some(7), "the open path wins");
+        assert!(!atlas.plan(atlas.map(107).unwrap(), None, Lang::Fr).gated);
+        assert_eq!(steps_to(&atlas, 300), Some(1));
+        assert!(atlas.plan(atlas.map(300).unwrap(), None, Lang::Fr).gated);
+    }
+
+    #[test]
+    fn map_outside_the_graph_uses_the_surface_map() {
         let mut w = line_world();
         w.maps.push(MapInfo {
-            id: 300,
-            x: 6,
-            y: 0,
             world_map: -1,
-            sub_area: 1,
-            neighbours: vec![998],
+            ..map(400, 6, vec![])
         });
         let atlas = Atlas::new(w);
-        assert_eq!(
-            atlas
-                .plan(atlas.map(300).unwrap(), None, Lang::Fr)
-                .zaap_steps,
-            Some(6)
-        );
+        assert_eq!(steps_to(&atlas, 400), Some(6));
     }
 
     #[test]
@@ -346,11 +409,5 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>(),
             vec![100]
         );
-    }
-
-    #[test]
-    fn edges_are_walkable_both_ways() {
-        let atlas = Atlas::new(line_world());
-        assert_eq!(atlas.distances_from(107).unwrap()[0], Some(7));
     }
 }

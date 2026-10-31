@@ -83,9 +83,15 @@ pub struct MapInfo {
     pub y: i32,
     pub world_map: i32,
     pub sub_area: i64,
-    /// Maps reachable by walking off an edge of this one.
-    pub neighbours: Vec<i64>,
+    /// Moves out of this map, from the world graph the client routes `/travel` with.
+    pub exits: Vec<Exit>,
 }
+
+/// One move from a walkable zone of a map to a zone of another: `[from zone, to map, to zone,
+/// gated]`. Walls, cliffs or water split some maps into zones that do not reach each other;
+/// `gated` moves need a quest, an item or another condition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Exit(pub u8, pub i64, pub u8, pub bool);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SubArea {
