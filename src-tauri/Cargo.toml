@@ -1,6 +1,6 @@
 [package]
 name = "travel-dofus"
-version = "0.3.0"
+version = "0.4.0"
 description = "Find Dofus NPCs, zaaps and map markers, and copy the /zaap + /travel route"
 authors = ["ZainadosRepo"]
 edition = "2021"
