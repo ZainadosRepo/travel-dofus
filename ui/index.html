@@ -13,25 +13,15 @@
     <main class="window">
       <header class="titlebar" data-tauri-drag-region>
         <h1 data-tauri-drag-region>Travel Dofus</h1>
-        <select id="profile" aria-label="Profil" title="Profil"></select>
         <button id="open-settings" class="icon-btn" type="button" aria-label="Réglages" title="Réglages">&#9881;</button>
         <button id="minimize" class="icon-btn" type="button" aria-label="Réduire" title="Réduire (Ctrl + Alt + P pour réafficher)">&#8211;</button>
         <button id="close" class="icon-btn" type="button" aria-label="Fermer" title="Fermer">&#10005;</button>
       </header>
       <p id="banner" class="banner" hidden></p>
-      <section class="controls">
-        <input id="query" type="search" placeholder="PNJ, zone, zaap ou position (4,-18)" autocomplete="off" spellcheck="false" autofocus />
-        <div class="row">
-          <label class="from">
-            Ma position
-            <input id="from" placeholder="3,-17" autocomplete="off" spellcheck="false" title="Pour comparer marche et zaap" />
-          </label>
-          <button id="mode" class="chip" type="button" title="Tab pour changer"></button>
-        </div>
-      </section>
+      <input id="query" type="search" placeholder="PNJ, zaap, repère ou x,y" autocomplete="off" spellcheck="false" autofocus />
       <ol id="results" class="results" aria-live="polite"></ol>
+      <p id="detail" class="detail" hidden></p>
       <p id="empty" class="empty"></p>
-      <footer id="footer" class="footer"></footer>
     </main>
 
     <dialog id="settings" class="panel">
@@ -40,6 +30,17 @@
         <button class="icon-btn" type="button" data-close aria-label="Fermer">&#10005;</button>
       </header>
       <div class="panel-body">
+        <label class="field">Profil <select id="profile"></select></label>
+        <section>
+          <p class="help">Chaque profil garde ses 6 favoris (Alt + 1 à 6).</p>
+          <div class="inline">
+            <button id="profile-add" class="btn secondary" type="button">Nouveau</button>
+            <button id="profile-rename" class="btn secondary" type="button">Renommer</button>
+            <button id="profile-delete" class="btn secondary" type="button">Supprimer</button>
+          </div>
+        </section>
+        <label class="field">Copie au clic <select id="copy-mode"></select></label>
+        <p class="help">Tab change ce qui est copié sans ouvrir les réglages.</p>
         <label class="field">Thème <select id="theme"></select></label>
         <label class="field">Langue des noms <select id="lang"></select></label>
         <label class="field">
@@ -52,15 +53,6 @@
           <input id="opacity" type="range" min="30" max="100" step="5" />
         </label>
         <section>
-          <h3>Profils</h3>
-          <p class="help">Chaque profil garde ses 6 favoris (touches Alt + 1 à 6).</p>
-          <div class="inline">
-            <button id="profile-add" class="btn secondary" type="button">Nouveau</button>
-            <button id="profile-rename" class="btn secondary" type="button">Renommer</button>
-            <button id="profile-delete" class="btn secondary" type="button">Supprimer</button>
-          </div>
-        </section>
-        <section>
           <h3>Mes positions</h3>
           <ul id="customs-list" class="mini-list"></ul>
           <button id="custom-add" class="btn secondary" type="button">Ajouter une position</button>
@@ -69,6 +61,7 @@
           <h3>Corrections</h3>
           <ul id="fixes-list" class="mini-list"></ul>
         </section>
+        <p id="status" class="help"></p>
       </div>
     </dialog>
 

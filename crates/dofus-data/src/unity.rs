@@ -510,10 +510,10 @@ impl ValueReader<'_, '_> {
                 r.align4();
                 Value::String(s)
             }
+            // Pixels of textures stored inside the object (small icons), kept for `icons`.
             "TypelessData" => {
                 let n = r.len(1)?;
-                r.take(n)?;
-                Value::Null
+                Value::from(r.take(n)?.to_vec())
             }
             "ReferencedObject" => self.referenced(node)?,
             "Array" => self.array(node)?,

@@ -3,9 +3,9 @@
 [![Release](https://img.shields.io/github/v/release/ZainadosRepo/travel-dofus)](https://github.com/ZainadosRepo/travel-dofus/releases/latest)
 [![CI](https://github.com/ZainadosRepo/travel-dofus/actions/workflows/ci.yml/badge.svg)](https://github.com/ZainadosRepo/travel-dofus/actions/workflows/ci.yml)
 
-Petite fenêtre toujours au-dessus de Dofus 3 : on cherche un PNJ, une zone, un zaap, un repère de la carte (banque, atelier…) ou une position `x,y`, et l'appli copie le trajet le plus court (`/zaap x,y` répété par l'anti lag, puis `/travel x,y`). Avec « Ma position », elle compare la marche directe et le passage par un zaap.
+Petite fenêtre toujours au-dessus de Dofus 3 : on cherche un PNJ, une zone, un zaap, un repère de la carte (banque, atelier…) ou une position `x,y`, et l'appli copie le trajet : `/zaap` du zaap le plus proche de la cible (répété par l'anti lag), puis `/travel x,y`.
 
-Les données (2 080 PNJ placés par les quêtes, 47 zaaps, 834 repères, 15 409 cartes et le graphe de déplacement du jeu, noms dans les 5 langues) sont extraites des fichiers du client et embarquées dans l'appli : aucune connexion n'est nécessaire. L'interface reprend les 11 thèmes et la police (Lexend) de Dofus 3.
+Les données (2 080 PNJ placés par les quêtes, 47 zaaps, 834 repères, 15 409 cartes et le graphe de déplacement du jeu, noms dans les 5 langues) sont extraites des fichiers du client et embarquées dans l'appli : aucune connexion n'est nécessaire. L'interface reprend les 11 thèmes, la police (Lexend), les icônes de la carte et les portraits des boss et le visage des PNJ de Dofus 3.
 
 ## Télécharger
 
@@ -34,23 +34,24 @@ Télécharger la nouvelle version et l'installer par-dessus l'ancienne. Les prof
 ## Utilisation
 
 1. Ouvrir Travel Dofus à côté du jeu : la fenêtre, de la taille d'un panneau du jeu, reste au-dessus de Dofus. La glisser par son titre et la redimensionner par ses bords pour la caser dans l'interface.
-2. Taper un nom de PNJ, de zone, de zaap ou de repère (accents et majuscules ignorés), ou une position comme `4,-18`.
+2. Taper un nom de PNJ, de zone, de zaap, de repère ou de boss (accents et majuscules ignorés), ou une position comme `4,-18`.
 3. Appuyer sur **Entrée** (ou cliquer sur le résultat) : le trajet est copié.
 4. Dans Dofus, coller dans le chat (**Ctrl + V**) et valider.
 
-Pour comparer la marche et le zaap, indiquer sa position actuelle dans **Ma position**.
+Les résultats sont des tuiles comme dans l'inventaire : l'icône de la carte du jeu (le portrait du boss pour un donjon, le visage du PNJ) et le nom, sans le mot que l'icône dit déjà (« Donjon des Squelettes » → « Squelettes »). La ligne sous la grille donne, pour la tuile sélectionnée ou survolée, la position, le zaap conseillé avec le nombre de cartes à faire ensuite, et la zone.
 
-Les distances suivent le graphe de déplacement du jeu : passages réels entre cartes, sens unique, murs et rivières qui coupent une carte. Elles sont comptées en cartes traversées. « Accès sous condition » signale un trajet qui passe par un accès réservé (quête, objet ou autre condition du jeu), comme pour une autre dimension ou certaines îles ; il n'est proposé que si aucun chemin libre n'existe.
+Les distances suivent le graphe de déplacement du jeu : passages réels entre cartes, sens unique, murs et rivières qui coupent une carte. Elles sont comptées en cartes traversées. « Sous condition » signale un trajet qui passe par un accès réservé (quête, objet ou autre condition du jeu), comme pour une autre dimension ou certaines îles ; il n'est proposé que si aucun chemin libre n'existe.
 
 | Action | Comment |
 | --- | --- |
 | Afficher / masquer la fenêtre | Ctrl + Alt + P, même depuis le jeu |
-| Copier le résultat sélectionné | Entrée, ou clic sur la carte |
-| Changer ce qui est copié (trajet, /zaap + /travel, /travel, /zaap, position, nom) | Tab / Maj + Tab, ou le bouton « Copie » |
-| Favori (6 par profil) | ☆ sur un résultat ; recherche vide = liste des favoris, glisser pour réordonner |
+| Se déplacer dans la grille | ↑ ↓, et ← → quand le curseur est en fin de texte |
+| Copier le résultat sélectionné | Entrée, ou clic sur la tuile |
+| Changer ce qui est copié (trajet, /zaap + /travel, /travel, /zaap, position, nom) | Tab / Maj + Tab (le mode s'affiche en bas), ou ⚙ › Copie au clic |
+| Favori (6 par profil) | clic droit › Ajouter aux favoris ; recherche vide = liste des favoris numérotés, glisser pour réordonner |
 | Copier un favori | Alt + 1 à 6 (ou 1 à 6 hors du champ de recherche) |
-| Corriger un PNJ, choisir son zaap, rétablir | clic droit ou ⋯ sur un résultat |
-| Profils, positions perso, anti lag, opacité, langue, thème | ⚙ |
+| Corriger un PNJ, choisir son zaap, copier autre chose, rétablir | clic droit sur un résultat (ou touche Menu / Maj + F10) |
+| Profil, mode de copie, positions perso, anti lag, opacité, langue, thème | ⚙ |
 
 La taille et la position de la fenêtre sont retenues. Les réglages sont dans `settings.json` :
 
@@ -61,7 +62,7 @@ Un fichier illisible est mis de côté en `settings.json.bad` au lieu d'être é
 
 ### Après une mise à jour de Dofus
 
-Le pied de la fenêtre indique la version des données. Si Dofus installé est plus récent, un bandeau le signale : les PNJ ou zaaps ajoutés par le patch manquent jusqu'à la prochaine version de l'appli.
+⚙ indique en bas la version des données. Si Dofus installé est plus récent, un bandeau le signale : les PNJ ou zaaps ajoutés par le patch manquent jusqu'à la prochaine version de l'appli.
 
 ## Développement
 
@@ -94,7 +95,7 @@ node --test "tests/ui/*.test.js"
 cargo run --release -p dofus-data --bin extract
 ```
 
-Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json` (quelques secondes).
+Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json`, les icônes de `ui/icons/` et les portraits de boss de `ui/icons/monster/` (une trentaine de secondes). Il télécharge ensuite, avec `curl`, le visage des PNJ nouveaux ou modifiés depuis le service de rendu public d'Ankama vers `ui/icons/npc/` (quelques minutes la première fois, quelques secondes après un patch). S'il s'arrête (limite de requêtes, réseau), le relancer reprend où il en était.
 
 ### Publier une version
 

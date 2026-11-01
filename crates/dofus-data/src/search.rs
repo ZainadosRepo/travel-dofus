@@ -1,5 +1,6 @@
 //! Free-text search over NPCs, zaaps and map markers in any client language, or a `x,y` position.
 
+use crate::icons::face_name;
 use crate::route::{Atlas, Plan};
 use crate::world::{Lang, Names};
 use serde::Serialize;
@@ -23,11 +24,14 @@ pub struct Place {
     /// Stable per kind: NPC id, zaap map id, marker index, 0 for a position.
     pub id: i64,
     pub name: String,
-    /// Sub-area for NPCs and positions, area for zaaps, category for markers.
+    /// Sub-area for NPCs, markers and positions, area for zaaps.
     pub detail: String,
     pub map_id: i64,
     pub x: i32,
     pub y: i32,
+    /// Picture under `ui/icons/` without `.png` (`401`, `monster/264`, `npc/<face>`): marker icon, boss
+    /// portrait or NPC face; empty when the kind's default picture applies.
+    pub icon: String,
     pub plan: Plan,
 }
 
@@ -61,6 +65,7 @@ struct Candidate {
     map_id: i64,
     x: i32,
     y: i32,
+    icon: String,
 }
 
 fn normalized(names: &Names) -> Vec<String> {
@@ -79,54 +84,79 @@ pub struct Searcher {
     candidates: Vec<Candidate>,
 }
 
+fn candidate(kind: Kind, id: i64, names: Names, detail: Names, map: (i64, i32, i32)) -> Candidate {
+    let (keys, details) = (normalized(&names), normalized(&detail));
+    let (map_id, x, y) = map;
+    Candidate {
+        kind,
+        id,
+        names,
+        detail,
+        keys,
+        details,
+        map_id,
+        x,
+        y,
+        icon: String::new(),
+    }
+}
+
 impl Searcher {
     pub fn new(atlas: &Atlas) -> Self {
         let mut candidates = Vec::new();
-        let mut push = |kind, id, names: Names, detail: Names, map_id, x, y| {
-            let (keys, details) = (normalized(&names), normalized(&detail));
-            candidates.push(Candidate {
-                kind,
-                id,
-                names,
-                detail,
-                keys,
-                details,
-                map_id,
-                x,
-                y,
-            });
-        };
         for &z in &atlas.world.zaaps {
             let Some(m) = atlas.map(z) else { continue };
             let Some(sub_area) = atlas.world.sub_areas.iter().find(|s| s.id == m.sub_area) else {
                 continue;
             };
-            push(
+            candidates.push(candidate(
                 Kind::Zaap,
                 m.id,
                 sub_area.names.clone(),
                 sub_area.area.clone(),
-                m.id,
-                m.x,
-                m.y,
-            );
+                (m.id, m.x, m.y),
+            ));
         }
         for npc in &atlas.world.npcs {
             for m in npc.maps.iter().filter_map(|&id| atlas.map(id)) {
                 let detail = atlas.sub_area_names(m).cloned().unwrap_or_default();
-                push(Kind::Npc, npc.id, npc.names.clone(), detail, m.id, m.x, m.y);
+                let mut c = candidate(
+                    Kind::Npc,
+                    npc.id,
+                    npc.names.clone(),
+                    detail,
+                    (m.id, m.x, m.y),
+                );
+                if !npc.look.is_empty() {
+                    c.icon = format!("npc/{}", face_name(&npc.look));
+                }
+                candidates.push(c);
             }
         }
         for (i, mk) in atlas.world.markers.iter().enumerate() {
-            push(
+            // The icon already says the category: show the zone, which tells two workshops apart.
+            let zone = atlas
+                .map(mk.map_id)
+                .or_else(|| atlas.surface_map_at(mk.x, mk.y))
+                .and_then(|m| atlas.sub_area_names(m))
+                .unwrap_or(&mk.category);
+            let mut c = candidate(
                 Kind::Marker,
                 i as i64,
                 mk.names.clone(),
-                mk.category.clone(),
-                mk.map_id,
-                mk.x,
-                mk.y,
+                zone.clone(),
+                (mk.map_id, mk.x, mk.y),
             );
+            c.details.extend(normalized(&mk.category));
+            c.icon = match &mk.boss {
+                Some(b) => {
+                    // Typing a boss finds its dungeon.
+                    c.keys.extend(normalized(&b.names));
+                    format!("monster/{}", b.gfx)
+                }
+                None => mk.gfx.to_string(),
+            };
+            candidates.push(c);
         }
         Searcher { candidates }
     }
@@ -167,6 +197,7 @@ impl Searcher {
                     map_id: m.id,
                     x,
                     y,
+                    icon: String::new(),
                     plan: plan_for(m.id, x, y),
                 });
             }
@@ -218,6 +249,7 @@ impl Searcher {
             map_id: c.map_id,
             x: c.x,
             y: c.y,
+            icon: c.icon.clone(),
             plan: plan_for(c.map_id, c.x, c.y),
         }));
         places
@@ -228,7 +260,7 @@ impl Searcher {
 mod tests {
     use super::*;
     use crate::route::tests::{line_world, names};
-    use crate::world::{Marker, Npc};
+    use crate::world::{Boss, Marker, Npc};
 
     fn atlas() -> Atlas {
         let mut w = line_world();
@@ -240,13 +272,28 @@ mod tests {
                 ..Default::default()
             },
             maps: vec![106],
+            look: "a".into(),
         });
         w.markers.push(Marker {
             names: names("Banque"),
             category: names("Divers"),
+            gfx: 401,
             map_id: 103,
             x: 3,
             y: 0,
+            boss: None,
+        });
+        w.markers.push(Marker {
+            names: names("Grotte"),
+            category: names("Donjons"),
+            gfx: 422,
+            map_id: 104,
+            x: 4,
+            y: 0,
+            boss: Some(Boss {
+                names: names("Bworker"),
+                gfx: 264,
+            }),
         });
         Atlas::new(w)
     }
@@ -273,6 +320,7 @@ mod tests {
         assert_eq!((hits[0].kind, hits[0].id), (Kind::Npc, 1));
         assert_eq!(hits[0].detail, "Astrub");
         assert_eq!(hits[0].plan.zaap_steps, Some(6));
+        assert_eq!(hits[0].icon, "npc/af63dc4c8601ec8c");
     }
 
     #[test]
@@ -282,6 +330,30 @@ mod tests {
         assert_eq!(hits[0].name, "Écaflip l'Ancien");
         let hits = Searcher::new(&a).search(&a, "ancien", None, Lang::En);
         assert_eq!(hits[0].name, "Ecaflip the Elder");
+    }
+
+    #[test]
+    fn a_boss_finds_its_dungeon_with_its_portrait() {
+        let a = atlas();
+        let hits = Searcher::new(&a).search(&a, "bworker", None, Lang::Fr);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(
+            (hits[0].name.as_str(), hits[0].icon.as_str()),
+            ("Grotte", "monster/264")
+        );
+        let bank = Searcher::new(&a).search(&a, "banque", None, Lang::Fr);
+        assert_eq!(bank[0].icon, "401");
+    }
+
+    #[test]
+    fn a_marker_shows_its_zone_and_is_found_by_its_category() {
+        let a = atlas();
+        let hits = Searcher::new(&a).search(&a, "donjons", None, Lang::Fr);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(
+            (hits[0].name.as_str(), hits[0].detail.as_str()),
+            ("Grotte", "Astrub")
+        );
     }
 
     #[test]

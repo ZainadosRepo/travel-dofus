@@ -105,6 +105,8 @@ pub struct Npc {
     pub id: i64,
     pub names: Names,
     pub maps: Vec<i64>,
+    /// Entity look (`{bone|skins|colours|scales|…}`), drawn as `ui/icons/npc/<face_name>.png`.
+    pub look: String,
 }
 
 /// A point the game shows on its world map (bank, workshop, dungeon, transport…).
@@ -112,9 +114,20 @@ pub struct Npc {
 pub struct Marker {
     pub names: Names,
     pub category: Names,
+    /// Icon the client draws on its map: `ui/icons/<gfx>.png`.
+    pub gfx: i64,
     pub map_id: i64,
     pub x: i32,
     pub y: i32,
+    /// Boss of the dungeon this marker is the entrance of.
+    pub boss: Option<Boss>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Boss {
+    pub names: Names,
+    /// Monster picture: `ui/icons/monster/<gfx>.png`.
+    pub gfx: i64,
 }
 
 #[cfg(test)]

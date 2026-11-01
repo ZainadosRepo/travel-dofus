@@ -20,10 +20,18 @@ export const LANGS = [
   ["es", "Español"],
   ["pt", "Português"],
 ];
-export const ICONS = ["📍", "🏠", "🏦", "⚒️", "🌾", "🌲", "⛏️", "🐟", "⚔️", "🐉", "💰", "🧪", "🛡️", "🐎", "⭐", "❤️", "🚩"];
+/** Client icons a custom position can take: `ui/icons/<name>.png` (flag, finish, bank, tavern, market, workshops, dungeon…). */
+export const ICONS = ["flag", "destination", "quest", "410", "401", "408", "226", "309", "305", "310", "311", "312", "301", "419", "416", "422"];
+/** Emoji icons saved before the client icons, mapped to the closest one. */
+const LEGACY_ICONS = {
+  "📍": "flag", "🏠": "416", "🏦": "401", "⚒️": "309", "🌾": "311", "🌲": "305", "⛏️": "310", "🐟": "312",
+  "⚔️": "422", "🐉": "422", "💰": "226", "🧪": "301", "🛡️": "416", "🐎": "419", "⭐": "destination", "❤️": "408", "🚩": "flag",
+};
 export const MAX_FAVORITES = 6;
 const KINDS = ["coords", "zaap", "npc", "marker", "custom"];
 const COLOR = /^#[0-9a-f]{6}$/i;
+/** Picture name under `ui/icons/`, as search results give it (`401`, `monster/264`, `npc/<face>`). */
+const ICON = /^((monster|npc)\/)?\w+$/;
 
 export function defaults() {
   return {
@@ -32,7 +40,6 @@ export function defaults() {
     antiLag: 2,
     opacity: 1,
     copyMode: "go",
-    from: "",
     profile: "p1",
     profiles: [{ id: "p1", name: "Principal", favorites: [] }],
     customs: [],
@@ -52,7 +59,7 @@ export function placeRef(v) {
   const y = int(v.y);
   if (x === null || y === null) return null;
   const id = Number.isInteger(v.id) || (typeof v.id === "string" && v.id) ? v.id : 0;
-  return { kind: v.kind, id, name: str(v.name), detail: str(v.detail), mapId: int(v.mapId) ?? 0, x, y };
+  return { kind: v.kind, id, name: str(v.name), detail: str(v.detail), mapId: int(v.mapId) ?? 0, x, y, icon: ICON.test(str(v.icon)) ? v.icon : "" };
 }
 
 function zaapRef(v) {
@@ -67,7 +74,7 @@ function custom(v) {
     name: str(v.name, "Position"),
     x: v.x,
     y: v.y,
-    icon: oneOf(v.icon, ICONS, ICONS[0]),
+    icon: oneOf(LEGACY_ICONS[v.icon] ?? v.icon, ICONS, ICONS[0]),
     color: COLOR.test(str(v.color)) ? v.color : "#f0ff4f",
   };
 }
@@ -103,7 +110,6 @@ export function normalize(raw) {
     antiLag: Math.round(clamp(raw.antiLag, 1, 5, d.antiLag)),
     opacity: clamp(raw.opacity, 0.3, 1, d.opacity),
     copyMode: str(raw.copyMode, d.copyMode),
-    from: str(raw.from),
     profile: profiles.some((p) => p.id === raw.profile) ? raw.profile : profiles[0].id,
     profiles,
     customs: (Array.isArray(raw.customs) ? raw.customs : []).map(custom).filter(Boolean),

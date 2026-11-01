@@ -16,7 +16,7 @@ test("values out of range are clamped or dropped", () => {
 });
 
 test("favorites keep valid places only, six at most", () => {
-  const good = { kind: "npc", id: 37, name: "Amine", detail: "Village", mapId: 9, x: 3, y: 1 };
+  const good = { kind: "marker", id: 37, name: "Banque", detail: "Divers", mapId: 9, x: 3, y: 1, icon: "monster/264" };
   const s = normalize({
     profile: "p2",
     profiles: [{ id: "p2", name: "Iop", favorites: [good, { kind: "npc", x: "3" }, ...Array(8).fill(good)] }],
@@ -24,6 +24,11 @@ test("favorites keep valid places only, six at most", () => {
   assert.equal(s.profile, "p2");
   assert.equal(s.profiles[0].favorites.length, 6);
   assert.deepEqual(s.profiles[0].favorites[0], good);
+});
+
+test("a favorite icon outside ui/icons is dropped", () => {
+  const s = normalize({ profiles: [{ id: "p1", favorites: [{ kind: "marker", id: 1, x: 1, y: 2, icon: "../../secret" }] }] });
+  assert.equal(s.profiles[0].favorites[0].icon, "");
 });
 
 test("an unknown current profile falls back to the first one", () => {
@@ -35,6 +40,11 @@ test("custom positions need coordinates and get a safe colour", () => {
   const s = normalize({ customs: [{ id: "c1", name: "Champ", x: 1, y: 2, color: "red" }, { id: "c2", name: "Sans x" }] });
   assert.equal(s.customs.length, 1);
   assert.equal(s.customs[0].color, "#f0ff4f");
+});
+
+test("custom positions saved with an emoji get the matching client icon", () => {
+  const s = normalize({ customs: [{ id: "c1", x: 1, y: 2, icon: "🏦" }, { id: "c2", x: 1, y: 2, icon: "gone" }] });
+  assert.deepEqual(s.customs.map((c) => c.icon), ["401", "flag"]);
 });
 
 test("corrections keep a position or a zaap, nothing else", () => {

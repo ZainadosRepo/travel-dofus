@@ -1,13 +1,17 @@
 //! Builds a [`World`] from a Dofus 3 install, read only.
 
 use crate::i18n::Texts;
+use crate::search::normalize;
 use crate::unity::{read_bundle, SerializedFile, MONO_BEHAVIOUR};
-use crate::world::{Exit, Lang, MapInfo, Marker, Names, Npc, SubArea, World};
+use crate::world::{Boss, Exit, Lang, MapInfo, Marker, Names, Npc, SubArea, World};
 use crate::{err, Result};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+
+/// `hintcategories` id of dungeon entrances.
+const DUNGEON_CATEGORY: i64 = 6;
 
 /// Quest objective types whose first parameter is an NPC to meet ("Aller voir", "Ramener à"…).
 const NPC_OBJECTIVE_TYPES: [i64; 6] = [1, 2, 3, 9, 10, 12];
@@ -23,7 +27,7 @@ pub fn default_game_dir() -> Option<PathBuf> {
     }
 }
 
-fn content(game: &Path) -> PathBuf {
+pub fn content(game: &Path) -> PathBuf {
     game.join("Dofus_Data")
         .join("StreamingAssets")
         .join("Content")
@@ -72,20 +76,23 @@ fn int(v: &Value, key: &str) -> i64 {
     v.get(key).and_then(Value::as_i64).unwrap_or_default()
 }
 
-/// Moves between map zones, from the `world-graph` object the client routes `/travel` with.
-fn world_graph(game: &Path) -> Result<HashMap<i64, Vec<Exit>>> {
+/// A bundle of `StreamingAssets/aa/<platform>/`.
+pub fn aa_bundle(game: &Path, file: &str) -> Result<PathBuf> {
     let aa = game.join("Dofus_Data").join("StreamingAssets").join("aa");
     // One platform folder per install (StandaloneWindows64, StandaloneOSX…).
-    let Some(path) = fs::read_dir(&aa)?
+    match fs::read_dir(&aa)?
         .filter_map(|e| e.ok())
-        .map(|e| e.path().join("worldassets_assets_all.bundle"))
+        .map(|e| e.path().join(file))
         .find(|p| p.is_file())
-    else {
-        return err(format!(
-            "{}: no worldassets_assets_all.bundle",
-            aa.display()
-        ));
-    };
+    {
+        Some(path) => Ok(path),
+        None => err(format!("{}: no {file}", aa.display())),
+    }
+}
+
+/// Moves between map zones, from the `world-graph` object the client routes `/travel` with.
+fn world_graph(game: &Path) -> Result<HashMap<i64, Vec<Exit>>> {
+    let path = aa_bundle(game, "worldassets_assets_all.bundle")?;
     let context = |e: crate::Error| crate::Error(format!("{}: {e}", path.display()));
     let bytes = fs::read(&path)?;
     for file in read_bundle(&bytes).map_err(context)? {
@@ -204,6 +211,10 @@ pub fn extract(game: &Path) -> Result<World> {
             npc_maps.entry(npc).or_default().insert(map);
         }
     }
+    let monsters: HashMap<i64, Value> = table(game, "monsters")?
+        .into_iter()
+        .map(|m| (int(&m, "id"), m))
+        .collect();
     let npcs = table(game, "npcs")?
         .iter()
         .filter_map(|n| {
@@ -218,6 +229,7 @@ pub fn extract(game: &Path) -> Result<World> {
                 id: int(n, "id"),
                 names,
                 maps,
+                look: n["look"].as_str().unwrap_or_default().to_owned(),
             })
         })
         .collect();
@@ -226,6 +238,23 @@ pub fn extract(game: &Path) -> Result<World> {
         .iter()
         .map(|c| (int(c, "id"), name(c, "nameId")))
         .collect();
+    // A dungeon hint sits on the dungeon's entrance map, or at least carries its name.
+    let (mut boss_at, mut boss_named) = (HashMap::new(), HashMap::new());
+    for d in table(game, "dungeons")? {
+        let Some(m) = d["bosses"]
+            .get(0)
+            .and_then(Value::as_i64)
+            .and_then(|id| monsters.get(&id))
+        else {
+            continue;
+        };
+        let boss = Boss {
+            names: name(m, "nameId"),
+            gfx: int(m, "gfxId"),
+        };
+        boss_named.insert(normalize(&name(&d, "nameId").fr), boss.clone());
+        boss_at.insert(int(&d, "entranceMapId"), boss);
+    }
     let markers = table(game, "hints")?
         .iter()
         .map(|h| Marker {
@@ -234,9 +263,18 @@ pub fn extract(game: &Path) -> Result<World> {
                 .get(&int(h, "categoryId"))
                 .cloned()
                 .unwrap_or_default(),
+            gfx: int(h, "gfx"),
             map_id: int(h, "mapId"),
             x: int(h, "x") as i32,
             y: int(h, "y") as i32,
+            boss: (int(h, "categoryId") == DUNGEON_CATEGORY)
+                .then(|| {
+                    boss_at
+                        .get(&int(h, "mapId"))
+                        .or_else(|| boss_named.get(&normalize(&name(h, "nameId").fr)))
+                })
+                .flatten()
+                .cloned(),
         })
         .filter(|m| !m.names.is_empty())
         .collect();

@@ -4,15 +4,19 @@ import { ICONS, LANGS, MAX_FAVORITES, THEMES, defaults, normalize, placeKey, pla
 const { invoke } = window.__TAURI__.core;
 const appWindow = window.__TAURI__.window.getCurrentWindow();
 
-const KIND_LABEL = { coords: "Position", zaap: "Zaap", npc: "PNJ", marker: "Repère", custom: "Perso" };
+/** Client icons (exported by the extractor) for results that carry no icon of their own. */
+const KIND_ICON = { coords: "destination", zaap: "410", npc: "quest", marker: "destination", custom: "flag" };
 const EMPTY_PLAN = { zaap: null, zaapSteps: null, walkSteps: null, takeZaap: false, gated: false };
+/** Leading words the tile's icon already says ("Donjon des Squelettes" → "Squelettes"). */
+const PREFIX = /^(donjon|atelier|h[ôo]tel de vente|temple|antre|zaap)\s+(de la |de l'|des |du |de |d')?/i;
 const COORDS = /^\s*\[?\s*(-?\d+)\s*[,; ]\s*(-?\d+)\s*\]?\s*$/;
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries(
   [
-    "profile", "query", "from", "mode", "results", "empty", "banner", "footer", "toast", "menu",
-    "settings", "theme", "lang", "antilag", "antilag-value", "opacity", "opacity-value", "customs-list", "fixes-list",
+    "query", "results", "detail", "empty", "banner", "toast", "menu",
+    "settings", "profile", "copy-mode", "theme", "lang", "antilag", "antilag-value", "opacity", "opacity-value",
+    "customs-list", "fixes-list", "status",
     "editor", "editor-form", "editor-title", "editor-fields", "editor-error",
   ].map((id) => [id, $(id)]),
 );
@@ -49,6 +53,7 @@ function button(label, className, onClick, title) {
 }
 
 const steps = (n) => `${n} carte${n > 1 ? "s" : ""}`;
+const modeLabel = (id) => (COPY_MODES.find((m) => m.id === id) ?? COPY_MODES[0]).label;
 const normalizeText = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const profile = () => settings.profiles.find((p) => p.id === settings.profile) ?? settings.profiles[0];
 const fixOf = (place) => settings.fixes[placeKey(place)];
@@ -98,8 +103,6 @@ function change(mutate, { refresh = true } = {}) {
   mutate(settings);
   save();
   applyLook();
-  renderProfiles();
-  renderMode();
   if (els.settings.open) renderSettingsPanel();
   if (refresh) runSearch();
 }
@@ -112,7 +115,7 @@ function applyLook() {
 // ---------- places
 
 async function planAt(x, y) {
-  const plan = await invoke("plan_at", { x, y, from: settings.from || null, lang: settings.lang });
+  const plan = await invoke("plan_at", { x, y, lang: settings.lang });
   return plan ?? EMPTY_PLAN;
 }
 
@@ -135,7 +138,7 @@ async function placesFor(query) {
   if (!query.trim()) return Promise.all(profile().favorites.map(resolve));
   const q = normalizeText(query.trim());
   const customs = settings.customs.filter((c) => normalizeText(c.name).includes(q)).map(customPlace);
-  const found = await invoke("search", { query, from: settings.from || null, lang: settings.lang });
+  const found = await invoke("search", { query, lang: settings.lang });
   return Promise.all([...customs, ...found].map(resolve));
 }
 
@@ -164,44 +167,57 @@ function scheduleSearch() {
 
 function routeText(place) {
   const forced = fixOf(place)?.zaap;
-  const { zaap, zaapSteps, walkSteps, takeZaap, gated } = place.plan;
-  if (forced) return `Zaap ${forced.name} [${forced.x},${forced.y}] (choisi)`;
-  const gate = gated ? " · accès sous condition" : "";
-  if (takeZaap && zaap) {
-    return zaapSteps === 0 ? `Sur le zaap ${zaap.name}` : `Zaap ${zaap.name} [${zaap.x},${zaap.y}] · ${steps(zaapSteps)}${gate}`;
-  }
-  if (walkSteps != null) return `À pied : ${steps(walkSteps)}${gate}${zaap ? ` · zaap à ${steps(zaapSteps)}` : ""}`;
-  return "Aucun zaap relié";
+  const { zaap, zaapSteps, takeZaap, gated } = place.plan;
+  const gate = gated ? " · sous condition" : "";
+  if (forced) return `Zaap ${forced.name} (choisi)`;
+  if (place.kind === "zaap") return place.detail;
+  if (takeZaap && zaap) return zaapSteps === 0 ? `Sur le zaap ${zaap.name}` : `Zaap ${zaap.name} · ${steps(zaapSteps)}${gate}`;
+  return "Aucun zaap relié, /travel direct";
 }
 
-function badge(place) {
-  if (place.kind !== "custom") return el("span", `kind ${place.kind}`, KIND_LABEL[place.kind]);
-  const icon = el("span", "kind custom", place.icon);
-  icon.style.setProperty("--custom", place.color);
-  return icon;
+
+function icon(name, fallback = "destination") {
+  const img = el("img", "icon");
+  img.alt = "";
+  img.draggable = false;
+  img.src = `icons/${name}.png`;
+  // A face the renderer could not draw, or a favorite saved with older data: show the kind's picture.
+  img.addEventListener("error", () => (img.src = `icons/${fallback}.png`), { once: true });
+  return img;
+}
+
+function placeIcon(place, index) {
+  const box = el("span", "pict");
+  box.append(icon(place.icon || KIND_ICON[place.kind], KIND_ICON[place.kind]));
+  if (place.kind === "custom") {
+    box.classList.add("custom");
+    box.style.setProperty("--custom", place.color);
+  }
+  if (showingFavorites) box.append(el("span", "slot", String(index + 1)));
+  return box;
+}
+
+/** One line under the grid: what the selected (or hovered) tile is and how to get there. */
+function showDetail(place) {
+  els.detail.hidden = !place;
+  if (!place) return;
+  const route = place.kind === "zaap" ? "" : ` · ${routeText(place)}`;
+  els.detail.textContent = `[${place.x},${place.y}]${place.fixed ? " corrigé" : ""}${route} · ${place.detail || place.name}`;
+  els.detail.title = els.detail.textContent;
 }
 
 function card(place, index) {
   const li = el("li", "card");
   li.classList.toggle("selected", index === selected);
-  const fav = favoriteIndex(place);
+  // Tiles can share a picture and a name (20 farmer workshops): zone, position and zaap tell them apart.
+  li.title = `${place.name}\n${[place.detail, `[${place.x},${place.y}]`].filter(Boolean).join(" · ")}\n${routeText(place)}`;
+  const pict = placeIcon(place, index);
+  if (!showingFavorites && favoriteIndex(place) >= 0) pict.append(el("span", "star", "★"));
+  const short = place.name.replace(PREFIX, "") || place.name;
+  li.append(pict, el("span", "name", short.charAt(0).toUpperCase() + short.slice(1)));
 
-  const title = el("div", "title");
-  if (showingFavorites) title.append(el("span", "slot", String(index + 1)));
-  title.append(badge(place), el("span", "name", place.name));
-  if (place.fixed) title.append(el("span", "tag", "corrigé"));
-
-  const meta = el("div", "meta", `${place.detail ? `${place.detail} · ` : ""}[${place.x},${place.y}]`);
-  const actions = el("div", "actions");
-  const modeLabel = COPY_MODES.find((m) => m.id === settings.copyMode)?.label ?? "Copier";
-  actions.append(
-    button(modeLabel, "btn primary", () => copyPlace(place), "Copier (Entrée)"),
-    button(fav >= 0 ? "★" : "☆", `btn secondary star${fav >= 0 ? " on" : ""}`, () => toggleFavorite(place), fav >= 0 ? "Retirer des favoris" : "Ajouter aux favoris"),
-    button("⋯", "btn secondary", (event) => openMenu(place, event.currentTarget), "Plus d'actions"),
-  );
-  const bottom = el("div", "bottom");
-  bottom.append(el("span", "route", routeText(place)), actions);
-  li.append(title, meta, bottom);
+  li.addEventListener("mouseenter", () => showDetail(place));
+  li.addEventListener("mouseleave", () => showDetail(places[selected]));
 
   li.addEventListener("click", () => {
     select(index);
@@ -237,9 +253,10 @@ function makeDraggable(li, index) {
 
 function render() {
   els.results.replaceChildren(...places.map(card));
+  showDetail(places[selected]);
   els.empty.hidden = places.length > 0;
   els.empty.textContent = showingFavorites
-    ? "Tape un nom de PNJ, une zone, « zaap » ou une position. ☆ ajoute un favori (Alt + 1 à 6)."
+    ? "Tape un PNJ, un zaap, un repère ou x,y. Clic : copier le trajet. Clic droit : favori, zaap, correction."
     : "Aucun résultat.";
 }
 
@@ -247,16 +264,14 @@ function select(index) {
   selected = Math.max(0, Math.min(index, places.length - 1));
   [...els.results.children].forEach((li, i) => li.classList.toggle("selected", i === selected));
   els.results.children[selected]?.scrollIntoView({ block: "nearest" });
+  showDetail(places[selected]);
 }
 
-function renderMode() {
-  const mode = COPY_MODES.find((m) => m.id === settings.copyMode) ?? COPY_MODES[0];
-  els.mode.textContent = `Copie : ${mode.label}`;
-}
+const columns = () => getComputedStyle(els.results).gridTemplateColumns.split(" ").length;
 
-function renderProfiles() {
-  els.profile.replaceChildren(...settings.profiles.map((p) => new Option(p.name, p.id)));
-  els.profile.value = settings.profile;
+function setCopyMode(id) {
+  change((s) => (s.copyMode = id), { refresh: false });
+  toast(`Copie : ${modeLabel(id)}`);
 }
 
 // ---------- favorites, corrections, custom positions
@@ -320,8 +335,8 @@ function editCustom(existing) {
     title: existing ? "Modifier la position" : "Nouvelle position",
     fields: [
       { name: "name", label: "Nom", type: "text", value: existing?.name ?? "" },
-      { name: "pos", label: "Position (x,y)", type: "coords", value: existing ? `${existing.x},${existing.y}` : settings.from },
-      { name: "icon", label: "Icône", type: "select", value: existing?.icon ?? ICONS[0], options: ICONS.map((i) => [i, i]) },
+      { name: "pos", label: "Position (x,y)", type: "coords", value: existing ? `${existing.x},${existing.y}` : "" },
+      { name: "icon", label: "Icône", type: "icon", value: existing?.icon ?? ICONS[0] },
       { name: "color", label: "Couleur", type: "color", value: existing?.color ?? "#f0ff4f" },
     ],
     onSave: ({ name, pos, icon, color }) =>
@@ -349,7 +364,8 @@ function closeMenu() {
 }
 
 function openMenu(place, anchor) {
-  const items = [];
+  const fav = favoriteIndex(place);
+  const items = [[fav >= 0 ? "Retirer des favoris" : "Ajouter aux favoris", () => toggleFavorite(place)]];
   if (place.kind === "npc" || place.kind === "marker") items.push(["Corriger la position", () => editPosition(place)]);
   if (place.kind !== "zaap") items.push(["Choisir le zaap", () => chooseZaap(place)]);
   if (place.fixed) items.push(["Rétablir l'original", () => restore(placeKey(place))]);
@@ -382,11 +398,25 @@ function openMenu(place, anchor) {
 
 let onEditorSave = null;
 
+function iconPicker(f) {
+  const set = el("fieldset", "field icon-picker");
+  set.append(el("legend", "", f.label));
+  for (const name of ICONS) {
+    const label = el("label");
+    const radio = el("input");
+    Object.assign(radio, { type: "radio", name: f.name, value: name, checked: name === f.value });
+    label.append(radio, icon(name));
+    set.append(label);
+  }
+  return set;
+}
+
 function openEditor({ title, fields, onSave }) {
   els["editor-title"].textContent = title;
   els["editor-error"].hidden = true;
   els["editor-fields"].replaceChildren(
     ...fields.map((f) => {
+      if (f.type === "icon") return iconPicker(f);
       const label = el("label", "field", f.label);
       let input;
       if (f.type === "select") {
@@ -413,6 +443,7 @@ els["editor-form"].addEventListener("submit", (event) => {
   event.preventDefault();
   const values = {};
   for (const input of els["editor-fields"].querySelectorAll("input, select")) {
+    if (input.type === "radio" && !input.checked) continue;
     if (input.dataset.type === "coords") {
       const pos = parseCoords(input.value);
       if (!pos) {
@@ -433,6 +464,9 @@ els["editor-form"].addEventListener("submit", (event) => {
 // ---------- settings panel
 
 function renderSettingsPanel() {
+  els.profile.replaceChildren(...settings.profiles.map((p) => new Option(p.name, p.id)));
+  els.profile.value = settings.profile;
+  els["copy-mode"].value = COPY_MODES.some((m) => m.id === settings.copyMode) ? settings.copyMode : COPY_MODES[0].id;
   els.theme.value = settings.theme;
   els.lang.value = settings.lang;
   els.antilag.value = String(settings.antiLag);
@@ -444,9 +478,10 @@ function renderSettingsPanel() {
   els["customs-list"].replaceChildren(
     ...settings.customs.map((c) => {
       const li = el("li");
-      const icon = el("span", "kind custom", c.icon);
-      icon.style.setProperty("--custom", c.color);
-      li.append(icon, el("span", "grow", `${c.name} [${c.x},${c.y}]`), button("Modifier", "btn secondary", () => editCustom(c)), button("Supprimer", "btn secondary", () => deleteCustom(c.id)));
+      const pict = el("span", "pict custom");
+      pict.append(icon(c.icon));
+      pict.style.setProperty("--custom", c.color);
+      li.append(pict, el("span", "grow", `${c.name} [${c.x},${c.y}]`), button("Modifier", "btn secondary", () => editCustom(c)), button("Supprimer", "btn secondary", () => deleteCustom(c.id)));
       return li;
     }),
   );
@@ -490,6 +525,8 @@ $("profile-delete").addEventListener("click", () => {
 $("custom-add").addEventListener("click", () => editCustom(null));
 
 for (const [value, label] of THEMES) els.theme.append(new Option(label, value));
+for (const mode of COPY_MODES) els["copy-mode"].append(new Option(mode.label, mode.id));
+els["copy-mode"].addEventListener("change", () => change((s) => (s.copyMode = els["copy-mode"].value), { refresh: false }));
 for (const [value, label] of LANGS) els.lang.append(new Option(label, value));
 els.theme.addEventListener("change", () => change((s) => (s.theme = els.theme.value), { refresh: false }));
 els.lang.addEventListener("change", () => change((s) => (s.lang = els.lang.value)));
@@ -509,22 +546,18 @@ $("open-settings").addEventListener("click", () => {
 // ---------- keyboard and window
 
 els.profile.addEventListener("change", () => change((s) => (s.profile = els.profile.value)));
-els.mode.addEventListener("click", () => {
-  change((s) => (s.copyMode = nextMode(s.copyMode)), { refresh: false });
-  render();
-});
-els.from.addEventListener("input", () => {
-  change((s) => (s.from = els.from.value.trim()), { refresh: false });
-  scheduleSearch();
-});
 els.query.addEventListener("input", scheduleSearch);
 els.query.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowDown") select(selected + 1);
-  else if (event.key === "ArrowUp") select(selected - 1);
+  // Left/right move through the grid only once the caret is at the end of the text.
+  const atEnd = els.query.selectionStart === els.query.value.length;
+  if (event.key === "ArrowDown") select(selected + columns());
+  else if (event.key === "ArrowUp") select(selected - columns());
+  else if (event.key === "ArrowRight" && atEnd) select(selected + 1);
+  else if (event.key === "ArrowLeft" && atEnd && places.length) select(selected - 1);
   else if (event.key === "Enter" && places[selected]) copyPlace(places[selected]);
-  else if (event.key === "Tab" && !event.ctrlKey && !event.altKey) {
-    change((s) => (s.copyMode = nextMode(s.copyMode, event.shiftKey ? -1 : 1)), { refresh: false });
-    render();
+  else if (event.key === "Tab" && !event.ctrlKey && !event.altKey) setCopyMode(nextMode(settings.copyMode, event.shiftKey ? -1 : 1));
+  else if ((event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) && places[selected]) {
+    openMenu(places[selected], els.results.children[selected]);
   } else if (event.key === "Escape") {
     els.query.value = "";
     scheduleSearch();
@@ -555,15 +588,14 @@ $("minimize").addEventListener("click", () => appWindow.minimize());
 async function showStatus() {
   try {
     const s = await invoke("data_status");
-    els.footer.textContent = `Dofus ${s.dataVersion} · ${s.npcs} PNJ · ${s.zaaps} zaaps · ${s.markers} repères`;
-    els.footer.title = els.footer.textContent;
+    els.status.textContent = `Données Dofus ${s.dataVersion} : ${s.npcs} PNJ, ${s.zaaps} zaaps, ${s.markers} repères.`;
     if (s.installedVersion && s.installedVersion !== s.dataVersion) {
       els.banner.textContent = `Dofus est en ${s.installedVersion}, les données datent de ${s.dataVersion} : relance l'extraction.`;
       els.banner.hidden = false;
     }
     if (s.shortcutError) toast(`Raccourci Ctrl + Alt + P indisponible : ${s.shortcutError}`, true);
   } catch (error) {
-    els.footer.textContent = `État des données indisponible : ${error}`;
+    els.status.textContent = `État des données indisponible : ${error}`;
   }
 }
 
@@ -576,10 +608,7 @@ async function start() {
     canSave = false;
     toast(`Réglages non lus, ils ne seront pas enregistrés : ${error}`, true);
   }
-  els.from.value = settings.from;
   applyLook();
-  renderProfiles();
-  renderMode();
   await runSearch();
   showStatus();
 }

@@ -3,6 +3,7 @@
 
 pub mod extract;
 pub mod i18n;
+pub mod icons;
 pub mod route;
 pub mod search;
 pub mod unity;

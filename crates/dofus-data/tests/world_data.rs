@@ -84,3 +84,57 @@ fn most_surface_maps_reach_a_zaap() {
         surface.len()
     );
 }
+
+#[test]
+fn every_icon_and_portrait_was_exported() {
+    let a = atlas();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/icons");
+    let missing: std::collections::BTreeSet<String> = a
+        .world
+        .markers
+        .iter()
+        .flat_map(|m| {
+            [
+                Some(m.gfx.to_string()),
+                m.boss.as_ref().map(|b| format!("monster/{}", b.gfx)),
+            ]
+        })
+        .flatten()
+        .chain(dofus_data::icons::UI_ICONS.map(String::from))
+        .filter(|name| !dir.join(format!("{name}.png")).is_file())
+        .collect();
+    assert!(missing.is_empty(), "re-run the extractor: {missing:?}");
+}
+
+#[test]
+fn almost_every_npc_has_its_face() {
+    let a = atlas();
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../ui/icons/npc");
+    let faces = a
+        .world
+        .npcs
+        .iter()
+        .filter(|n| {
+            dir.join(format!("{}.png", dofus_data::icons::face_name(&n.look)))
+                .is_file()
+        })
+        .count();
+    // The renderer may not draw a few looks; the app shows the quest icon for those.
+    assert!(
+        faces * 100 > a.world.npcs.len() * 95,
+        "{faces}/{}",
+        a.world.npcs.len()
+    );
+}
+
+#[test]
+fn most_dungeons_show_their_boss() {
+    let a = atlas();
+    let dungeons: Vec<_> = a.world.markers.iter().filter(|m| m.gfx == 422).collect();
+    let with_boss = dungeons.iter().filter(|m| m.boss.is_some()).count();
+    assert!(
+        with_boss * 10 > dungeons.len() * 9,
+        "{with_boss}/{}",
+        dungeons.len()
+    );
+}
