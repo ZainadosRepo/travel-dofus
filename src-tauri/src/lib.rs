@@ -3,7 +3,7 @@ mod update;
 
 use dofus_data::extract::{default_game_dir, installed_version};
 use dofus_data::route::{Atlas, Plan, ZaapStop};
-use dofus_data::search::{parse_coords, Place, Searcher};
+use dofus_data::search::{Place, Searcher};
 use dofus_data::world::{Lang, World};
 use serde::Serialize;
 use std::sync::OnceLock;
@@ -20,36 +20,15 @@ struct AppState {
     shortcut_error: OnceLock<String>,
 }
 
-impl AppState {
-    fn distances(&self, from: Option<&str>) -> Option<Vec<Option<u32>>> {
-        let (x, y) = parse_coords(from?)?;
-        self.atlas
-            .distances_from(self.atlas.surface_map_at(x, y)?.id)
-    }
-}
-
 #[tauri::command]
-fn search(
-    state: tauri::State<AppState>,
-    query: String,
-    from: Option<String>,
-    lang: Lang,
-) -> Vec<Place> {
-    let from = from.as_deref().and_then(parse_coords);
-    state.searcher.search(&state.atlas, &query, from, lang)
+fn search(state: tauri::State<AppState>, query: String, lang: Lang) -> Vec<Place> {
+    state.searcher.search(&state.atlas, &query, None, lang)
 }
 
 /// Route to bare coordinates: custom positions and corrected NPCs.
 #[tauri::command]
-fn plan_at(
-    state: tauri::State<AppState>,
-    x: i32,
-    y: i32,
-    from: Option<String>,
-    lang: Lang,
-) -> Option<Plan> {
-    let distances = state.distances(from.as_deref());
-    state.atlas.plan_at(x, y, distances.as_deref(), lang)
+fn plan_at(state: tauri::State<AppState>, x: i32, y: i32, lang: Lang) -> Option<Plan> {
+    state.atlas.plan_at(x, y, None, lang)
 }
 
 #[tauri::command]
