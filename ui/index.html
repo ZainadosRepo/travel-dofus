@@ -12,15 +12,14 @@
   <body>
     <main class="window">
       <header class="titlebar" data-tauri-drag-region>
-        <h1 data-tauri-drag-region>Travel Dofus</h1>
+        <span class="grip" data-tauri-drag-region title="Déplacer la fenêtre"></span>
+        <input id="query" type="search" placeholder="PNJ, zaap, repère ou x,y" aria-label="Rechercher" autocomplete="off" spellcheck="false" autofocus />
         <button id="open-settings" class="icon-btn" type="button" aria-label="Réglages" title="Réglages">&#9881;</button>
         <button id="minimize" class="icon-btn" type="button" aria-label="Réduire" title="Réduire (Ctrl + Alt + P pour réafficher)">&#8211;</button>
         <button id="close" class="icon-btn" type="button" aria-label="Fermer" title="Fermer">&#10005;</button>
       </header>
       <p id="banner" class="banner" hidden></p>
-      <input id="query" type="search" placeholder="PNJ, zaap, repère ou x,y" autocomplete="off" spellcheck="false" autofocus />
       <ol id="results" class="results" aria-live="polite"></ol>
-      <p id="detail" class="detail" hidden></p>
       <p id="empty" class="empty"></p>
     </main>
 
@@ -81,6 +80,7 @@
     </dialog>
 
     <div id="menu" class="menu" role="menu" hidden></div>
+    <div id="tip" class="tip" role="tooltip"></div>
     <p id="toast" class="toast" role="status" hidden></p>
   </body>
 </html>

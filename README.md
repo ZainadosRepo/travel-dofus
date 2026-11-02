@@ -35,12 +35,12 @@ Jusqu'à la version 0.4.0 incluse, l'appli ne fait pas cette vérification : té
 
 ## Utilisation
 
-1. Ouvrir Travel Dofus à côté du jeu : la fenêtre, de la taille d'un panneau du jeu, reste au-dessus de Dofus. La glisser par son titre et la redimensionner par ses bords pour la caser dans l'interface.
+1. Ouvrir Travel Dofus à côté du jeu : la fenêtre, de la taille d'un panneau du jeu, reste au-dessus de Dofus. La glisser par la poignée à gauche du champ de recherche et la redimensionner par ses bords pour la caser dans l'interface.
 2. Taper un nom de PNJ, de zone, de zaap, de repère ou de boss (accents et majuscules ignorés), ou une position comme `4,-18`.
 3. Appuyer sur **Entrée** (ou cliquer sur le résultat) : le trajet est copié.
 4. Dans Dofus, coller dans le chat (**Ctrl + V**) et valider.
 
-Les résultats sont des tuiles comme dans l'inventaire : l'icône de la carte du jeu (le portrait du boss pour un donjon, le visage du PNJ) et le nom, sans le mot que l'icône dit déjà (« Donjon des Squelettes » → « Squelettes »). La ligne sous la grille donne, pour la tuile sélectionnée ou survolée, la position, le zaap conseillé avec le nombre de cartes à faire ensuite, et la zone.
+Les résultats sont des tuiles comme les cases de l'inventaire : seulement l'icône de la carte du jeu (le portrait du boss pour un donjon, le visage du PNJ). Survoler une tuile, ou la sélectionner au clavier, affiche aussitôt son nom, sa position, sa zone et le zaap conseillé avec le nombre de cartes à faire ensuite.
 
 Les distances suivent le graphe de déplacement du jeu : passages réels entre cartes, sens unique, murs et rivières qui coupent une carte. Elles sont comptées en cartes traversées. « Sous condition » signale un trajet qui passe par un accès réservé (quête, objet ou autre condition du jeu), comme pour une autre dimension ou certaines îles ; il n'est proposé que si aucun chemin libre n'existe.
 

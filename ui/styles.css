@@ -50,27 +50,23 @@ body {
   box-shadow: var(--panel-inner);
 }
 
+/* Search, settings and window buttons on one row; the grip and the gaps move the window. */
 .titlebar {
   display: flex;
   align-items: center;
   gap: 3px;
-  padding: 3px 3px 3px 8px;
+  padding: 3px;
   background: linear-gradient(180deg, var(--header_background), transparent);
   border-bottom: 1px solid var(--highlight_secondary25);
   user-select: none;
 }
 
-.titlebar h1 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font-size: 12px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--highlight_secondary100);
+.grip {
+  flex: none;
+  align-self: stretch;
+  width: 8px;
+  cursor: grab;
+  background: radial-gradient(circle, var(--white_white50) 1px, transparent 1.2px) center / 4px 4px;
 }
 
 input,
@@ -128,30 +124,30 @@ select option {
 }
 
 #query {
-  margin: 5px 6px;
-  padding: 4px 7px;
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
 }
 
-/* Tiles like the game's inventory: picture first, name under it, details in the line below the grid. */
+/* Tiles like the game's inventory slots: picture only, name and route in the hover card (`.tip`). */
 .results {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(34px, 1fr));
   align-content: start;
   gap: 3px;
   margin: 0;
-  padding: 0 6px 6px;
+  padding: 5px 6px 6px;
   list-style: none;
   overflow-y: auto;
 }
 
 .card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  display: grid;
+  place-items: center;
   min-width: 0;
-  padding: 4px 2px 3px;
+  aspect-ratio: 1;
+  padding: 2px;
   border: 1px solid var(--white_white10);
   border-radius: 3px;
   background: var(--black_black35);
@@ -169,13 +165,13 @@ select option {
 
 .card .pict,
 .card .pict .icon {
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
 }
 
 .card .pict.custom .icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
 }
 
 /* Client map icon, with the favorite slot number over its corner. */
@@ -204,20 +200,6 @@ select option {
   height: 18px;
 }
 
-.name {
-  display: -webkit-box;
-  width: 100%;
-  overflow: hidden;
-  /* Inventory-label size: 4 tiles in a 260 px window still fit "Alchimistes" on one line. */
-  font-size: 10px;
-  line-height: 1.15;
-  letter-spacing: -0.01em;
-  text-align: center;
-  overflow-wrap: anywhere;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
 .star {
   position: absolute;
   right: -4px;
@@ -226,15 +208,37 @@ select option {
   color: var(--highlight_primary100);
 }
 
-.detail {
-  margin: 0;
-  padding: 3px 6px;
-  overflow: hidden;
+.tip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  max-width: min(240px, calc(100vw - 8px));
+  padding: 3px 7px;
+  border: 1px solid var(--highlight_secondary25);
+  border-radius: 3px;
   font-size: 11px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  color: var(--white_white80);
+  background: var(--background_dark100);
+  box-shadow: var(--drop-light);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 80ms ease-out, visibility 0s 80ms;
+}
+
+.tip.shown {
+  opacity: var(--opacity);
+  visibility: visible;
+  transition: opacity 80ms ease-out, translate 90ms ease-out;
+}
+
+.tip strong {
+  font-weight: 600;
   color: var(--highlight_secondary100);
-  border-top: 1px solid var(--white_white10);
 }
 
 .btn {
@@ -288,7 +292,7 @@ select option {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 22px;
+  bottom: 6px;
   max-width: 90%;
   margin: 0;
   padding: 3px 9px;

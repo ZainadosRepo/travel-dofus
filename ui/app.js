@@ -7,14 +7,12 @@ const appWindow = window.__TAURI__.window.getCurrentWindow();
 /** Client icons (exported by the extractor) for results that carry no icon of their own. */
 const KIND_ICON = { coords: "destination", zaap: "410", npc: "quest", marker: "destination", custom: "flag" };
 const EMPTY_PLAN = { zaap: null, zaapSteps: null, walkSteps: null, takeZaap: false, gated: false };
-/** Leading words the tile's icon already says ("Donjon des Squelettes" → "Squelettes"). */
-const PREFIX = /^(donjon|atelier|h[ôo]tel de vente|temple|antre|zaap)\s+(de la |de l'|des |du |de |d')?/i;
 const COORDS = /^\s*\[?\s*(-?\d+)\s*[,; ]\s*(-?\d+)\s*\]?\s*$/;
 
 const $ = (id) => document.getElementById(id);
 const els = Object.fromEntries(
   [
-    "query", "results", "detail", "empty", "banner", "toast", "menu",
+    "query", "results", "tip", "empty", "banner", "toast", "menu",
     "settings", "profile", "copy-mode", "theme", "lang", "antilag", "antilag-value", "opacity", "opacity-value",
     "customs-list", "fixes-list", "status",
     "editor", "editor-form", "editor-title", "editor-fields", "editor-error",
@@ -29,6 +27,7 @@ let selected = 0;
 let requestId = 0;
 let showingFavorites = false;
 let toastTimer;
+let tipTimer;
 let saveTimer;
 let searchTimer;
 
@@ -197,27 +196,43 @@ function placeIcon(place, index) {
   return box;
 }
 
-/** One line under the grid: what the selected (or hovered) tile is and how to get there. */
-function showDetail(place) {
-  els.detail.hidden = !place;
-  if (!place) return;
-  const route = place.kind === "zaap" ? "" : ` · ${routeText(place)}`;
-  els.detail.textContent = `[${place.x},${place.y}]${place.fixed ? " corrigé" : ""}${route} · ${place.detail || place.name}`;
-  els.detail.title = els.detail.textContent;
+/**
+ * Hover card of a tile, which only shows its picture: name, position, zone and zaap. Tiles can
+ * share a picture and a name (20 farmer workshops), so zone and zaap tell them apart. Replaces the
+ * native `title`, which waits about a second before showing.
+ */
+function showTip(place, li) {
+  if (!place || !li) return hideTip();
+  clearTimeout(tipTimer);
+  const where = [`[${place.x},${place.y}]${place.fixed ? " corrigé" : ""}`, place.detail].filter(Boolean).join(" · ");
+  els.tip.replaceChildren(el("strong", "", place.name), el("span", "", where));
+  if (place.kind !== "zaap") els.tip.append(el("span", "", routeText(place)));
+  const box = li.getBoundingClientRect();
+  const { width, height } = els.tip.getBoundingClientRect();
+  const left = Math.min(Math.max(4, box.left + box.width / 2 - width / 2), innerWidth - width - 4);
+  const top = box.bottom + 4 + height <= innerHeight ? box.bottom + 4 : Math.max(4, box.top - height - 4);
+  els.tip.style.translate = `${Math.max(4, left)}px ${top}px`;
+  // Glide from tile to tile, but appear in place: commit the position before the transition applies.
+  if (!els.tip.classList.contains("shown")) void els.tip.offsetWidth;
+  els.tip.classList.add("shown");
+}
+
+/** `delay` lets the pointer cross the gap to the next tile without the card blinking. */
+function hideTip(delay = 0) {
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => els.tip.classList.remove("shown"), delay);
 }
 
 function card(place, index) {
   const li = el("li", "card");
   li.classList.toggle("selected", index === selected);
-  // Tiles can share a picture and a name (20 farmer workshops): zone, position and zaap tell them apart.
-  li.title = `${place.name}\n${[place.detail, `[${place.x},${place.y}]`].filter(Boolean).join(" · ")}\n${routeText(place)}`;
+  li.setAttribute("aria-label", place.name);
   const pict = placeIcon(place, index);
   if (!showingFavorites && favoriteIndex(place) >= 0) pict.append(el("span", "star", "★"));
-  const short = place.name.replace(PREFIX, "") || place.name;
-  li.append(pict, el("span", "name", short.charAt(0).toUpperCase() + short.slice(1)));
+  li.append(pict);
 
-  li.addEventListener("mouseenter", () => showDetail(place));
-  li.addEventListener("mouseleave", () => showDetail(places[selected]));
+  li.addEventListener("mouseenter", () => showTip(place, li));
+  li.addEventListener("mouseleave", () => hideTip(60));
 
   li.addEventListener("click", () => {
     select(index);
@@ -226,6 +241,7 @@ function card(place, index) {
   li.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     select(index);
+    hideTip();
     openMenu(place, li);
   });
   if (showingFavorites) makeDraggable(li, index);
@@ -253,7 +269,7 @@ function makeDraggable(li, index) {
 
 function render() {
   els.results.replaceChildren(...places.map(card));
-  showDetail(places[selected]);
+  hideTip();
   els.empty.hidden = places.length > 0;
   els.empty.textContent = showingFavorites
     ? "Tape un PNJ, un zaap, un repère ou x,y. Clic : copier le trajet. Clic droit : favori, zaap, correction."
@@ -264,7 +280,7 @@ function select(index) {
   selected = Math.max(0, Math.min(index, places.length - 1));
   [...els.results.children].forEach((li, i) => li.classList.toggle("selected", i === selected));
   els.results.children[selected]?.scrollIntoView({ block: "nearest" });
-  showDetail(places[selected]);
+  showTip(places[selected], els.results.children[selected]);
 }
 
 const columns = () => getComputedStyle(els.results).gridTemplateColumns.split(" ").length;
@@ -547,6 +563,7 @@ $("open-settings").addEventListener("click", () => {
 
 els.profile.addEventListener("change", () => change((s) => (s.profile = els.profile.value)));
 els.query.addEventListener("input", scheduleSearch);
+els.results.addEventListener("scroll", () => hideTip(), { passive: true });
 els.query.addEventListener("keydown", (event) => {
   // Left/right move through the grid only once the caret is at the end of the text.
   const atEnd = els.query.selectionStart === els.query.value.length;
