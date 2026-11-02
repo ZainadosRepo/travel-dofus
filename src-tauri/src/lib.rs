@@ -1,4 +1,5 @@
 mod settings;
+mod update;
 
 use dofus_data::extract::{default_game_dir, installed_version};
 use dofus_data::route::{Atlas, Plan, ZaapStop};
@@ -125,6 +126,8 @@ pub fn run() {
     let searcher = Searcher::new(&atlas);
     let toggle = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -144,6 +147,7 @@ pub fn run() {
             if let Err(e) = app.global_shortcut().register(toggle) {
                 let _ = app.state::<AppState>().shortcut_error.set(e.to_string());
             }
+            update::check_in_background(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
