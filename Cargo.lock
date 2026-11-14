@@ -4132,7 +4132,7 @@ dependencies = [
 
 [[package]]
 name = "travel-dofus"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "dofus-data",
  "serde",
