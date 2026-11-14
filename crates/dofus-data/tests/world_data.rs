@@ -85,6 +85,13 @@ fn most_surface_maps_reach_a_zaap() {
     );
 }
 
+/// Marker pictures the client itself does not ship (checked in its UI bundles); the app shows its
+/// fallback picture for them. A new entry needs the same check, not just a line here.
+const NOT_IN_CLIENT: &[&str] = &[
+    // "Portail vers la Source" (3.7.13): `uidarkstone` has 474 and 476, no 475.
+    "475",
+];
+
 #[test]
 fn every_icon_and_portrait_was_exported() {
     let a = atlas();
@@ -101,6 +108,7 @@ fn every_icon_and_portrait_was_exported() {
         })
         .flatten()
         .chain(dofus_data::icons::UI_ICONS.map(String::from))
+        .filter(|name| !NOT_IN_CLIENT.contains(&name.as_str()))
         .filter(|name| !dir.join(format!("{name}.png")).is_file())
         .collect();
     assert!(missing.is_empty(), "re-run the extractor: {missing:?}");
