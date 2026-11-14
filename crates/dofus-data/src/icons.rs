@@ -32,10 +32,67 @@ pub fn face_name(look: &str) -> String {
     format!("{hash:016x}")
 }
 
+#[derive(Debug, PartialEq)]
+enum Fetch {
+    Done,
+    Refused,
+    /// The renderer cannot draw this look: it hangs until curl's timeout, or answers an error.
+    Unavailable,
+    /// No answer at all (offline, DNS): says nothing about the look, so it is retried next run.
+    Unreachable,
+}
+
+/// Classifies one renderer request from curl's exit code and the HTTP status it printed.
+fn classify(curl_exit: Option<i32>, http: &str) -> Fetch {
+    const CURL_TIMEOUT: i32 = 28;
+    match http {
+        "200" => Fetch::Done,
+        "403" | "429" => Fetch::Refused,
+        _ if http.starts_with('4') || http.starts_with('5') => Fetch::Unavailable,
+        _ if curl_exit == Some(CURL_TIMEOUT) => Fetch::Unavailable,
+        _ => Fetch::Unreachable,
+    }
+}
+
+const UNAVAILABLE_HEADER: &str =
+    "# NPC faces Ankama's renderer could not draw; the extractor skips them. Delete this file to retry.\n";
+
+/// Face names listed in `path`, one per line (`#` comments); none when the file does not exist.
+fn read_names(path: &Path) -> Result<BTreeSet<String>> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(text
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(String::from)
+            .collect()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BTreeSet::new()),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Writes the names sorted under a header, or removes the file when there are none.
+fn write_names(path: &Path, names: &BTreeSet<String>) -> Result<()> {
+    if names.is_empty() {
+        return match fs::remove_file(path) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.into()),
+            _ => Ok(()),
+        };
+    }
+    let body: String = names.iter().map(|n| format!("{n}\n")).collect();
+    Ok(fs::write(path, format!("{UNAVAILABLE_HEADER}{body}"))?)
+}
+
 /// Fetches the face of each look missing from `out` (64×64 PNG), removes faces no look uses any more,
 /// and returns how many were fetched plus the looks the renderer could not draw (it times out or
-/// errors on some). Stops at the first refusal (403, 429): what was fetched stays, the next run resumes.
-pub fn fetch_faces(looks: &BTreeSet<String>, out: &Path) -> Result<(usize, Vec<String>)> {
+/// errors on some). Those are listed in `unavailable` and skipped by later runs instead of costing a
+/// 15 s timeout each time; a changed look has a new name, so it is tried again. Stops at the first
+/// refusal (403, 429): what was fetched stays, the next run resumes.
+pub fn fetch_faces(
+    looks: &BTreeSet<String>,
+    out: &Path,
+    unavailable: &Path,
+) -> Result<(usize, Vec<String>)> {
     fs::create_dir_all(out)?;
     let wanted: BTreeSet<String> = looks
         .iter()
@@ -46,10 +103,20 @@ pub fn fetch_faces(looks: &BTreeSet<String>, out: &Path) -> Result<(usize, Vec<S
             fs::remove_file(entry.path())?;
         }
     }
-    let (mut fetched, mut failed) = (0, Vec::new());
+    // Only names of looks still in use and still without a face stay listed.
+    let mut skipped: BTreeSet<String> = read_names(unavailable)?
+        .into_iter()
+        .filter(|n| wanted.contains(&format!("{n}.png")) && !out.join(format!("{n}.png")).is_file())
+        .collect();
+    let (mut fetched, mut failed, mut refused) = (0, Vec::new(), None);
     for look in looks {
-        let path = out.join(format!("{}.png", face_name(look)));
+        let name = face_name(look);
+        let path = out.join(format!("{name}.png"));
         if path.is_file() {
+            continue;
+        }
+        if skipped.contains(&name) {
+            failed.push(look.clone());
             continue;
         }
         let hex: String = look.bytes().map(|b| format!("{b:02x}")).collect();
@@ -61,19 +128,29 @@ pub fn fetch_faces(looks: &BTreeSet<String>, out: &Path) -> Result<(usize, Vec<S
             .output()
             .map_err(|e| crate::Error(format!("curl: {e}")))?;
         let code = String::from_utf8_lossy(&status.stdout).trim().to_owned();
-        if code == "200" {
+        let result = classify(status.status.code(), &code);
+        if result == Fetch::Done {
             fetched += 1;
         } else {
             // Keep no error page under a face's name (curl may not have created the file at all).
             let _ = fs::remove_file(&path);
-            if code == "403" || code == "429" {
-                return err(format!("renderer refused ({code}) after {fetched} faces"));
+            if result == Fetch::Refused {
+                refused = Some(code);
+                break;
+            }
+            if result == Fetch::Unavailable {
+                skipped.insert(name);
             }
             failed.push(look.clone());
         }
         std::thread::sleep(POLITE_DELAY);
     }
-    Ok((fetched, failed))
+    // Written before a refusal is reported, so the next run does not wait on these looks again.
+    write_names(unavailable, &skipped)?;
+    match refused {
+        Some(code) => err(format!("renderer refused ({code}) after {fetched} faces")),
+        None => Ok((fetched, failed)),
+    }
 }
 
 /// Writes `<out>/<name>.png` for each wanted texture name of a bundle and returns the names written.
@@ -186,6 +263,62 @@ mod tests {
     fn face_names_are_stable_fnv1a_hashes() {
         assert_eq!(face_name(""), "cbf29ce484222325");
         assert_eq!(face_name("a"), "af63dc4c8601ec8c");
+    }
+
+    #[test]
+    fn only_timeouts_and_error_answers_mark_a_look_unavailable() {
+        assert_eq!(classify(Some(0), "200"), Fetch::Done);
+        assert_eq!(classify(Some(0), "429"), Fetch::Refused);
+        assert_eq!(classify(Some(0), "403"), Fetch::Refused);
+        assert_eq!(classify(Some(28), "000"), Fetch::Unavailable);
+        assert_eq!(classify(Some(0), "500"), Fetch::Unavailable);
+        assert_eq!(classify(Some(0), "404"), Fetch::Unavailable);
+        // Offline or DNS failure: not the look's fault.
+        assert_eq!(classify(Some(6), "000"), Fetch::Unreachable);
+        assert_eq!(classify(Some(7), "000"), Fetch::Unreachable);
+        assert_eq!(classify(None, ""), Fetch::Unreachable);
+    }
+
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("travel-dofus-test-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("npc")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn listed_looks_are_skipped_and_the_list_keeps_only_looks_in_use() {
+        let dir = scratch("unavailable");
+        let (npc, list) = (dir.join("npc"), dir.join("npc-faces-unavailable.txt"));
+        fs::write(npc.join(format!("{}.png", face_name("drawn"))), b"png").unwrap();
+        fs::write(npc.join("gone.png"), b"png").unwrap();
+        let text = format!("# old\n{}\nnot-a-look-any-more\n", face_name("hangs"));
+        fs::write(&list, text).unwrap();
+        let looks: BTreeSet<String> = ["drawn", "hangs"].map(String::from).into();
+
+        // Every look has a face or is listed, so no request is made.
+        let (fetched, failed) = fetch_faces(&looks, &npc, &list).unwrap();
+
+        assert_eq!((fetched, failed), (0, vec!["hangs".to_owned()]));
+        assert!(!npc.join("gone.png").exists());
+        let kept = read_names(&list).unwrap();
+        assert_eq!(kept, [face_name("hangs")].into());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn the_list_goes_away_once_every_listed_look_has_a_face() {
+        let dir = scratch("drawn-later");
+        let (npc, list) = (dir.join("npc"), dir.join("npc-faces-unavailable.txt"));
+        fs::write(npc.join(format!("{}.png", face_name("fixed"))), b"png").unwrap();
+        fs::write(&list, format!("{}\n", face_name("fixed"))).unwrap();
+        let looks: BTreeSet<String> = ["fixed"].map(String::from).into();
+
+        fetch_faces(&looks, &npc, &list).unwrap();
+
+        assert!(!list.exists());
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

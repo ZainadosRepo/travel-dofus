@@ -97,7 +97,7 @@ node --test "tests/ui/*.test.js"
 cargo run --release -p dofus-data --bin extract
 ```
 
-Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json`, les icônes de `ui/icons/` et les portraits de boss de `ui/icons/monster/` (une trentaine de secondes). Il télécharge ensuite, avec `curl`, le visage des PNJ nouveaux ou modifiés depuis le service de rendu public d'Ankama vers `ui/icons/npc/` (quelques minutes la première fois, quelques secondes après un patch). S'il s'arrête (limite de requêtes, réseau), le relancer reprend où il en était.
+Relit l'install en lecture seule (`%LOCALAPPDATA%\Ankama\Dofus-dofus3` sous Windows, ou le dossier passé en argument) et réécrit `data/world.json`, les icônes de `ui/icons/` et les portraits de boss de `ui/icons/monster/` (une trentaine de secondes). Il télécharge ensuite, avec `curl`, le visage des PNJ nouveaux ou modifiés depuis le service de rendu public d'Ankama vers `ui/icons/npc/` (quelques minutes la première fois, quelques secondes après un patch). S'il s'arrête (limite de requêtes, réseau), le relancer reprend où il en était. Les apparences que le service ne sait pas dessiner (il ne répond pas ou renvoie une erreur) sont notées dans `data/npc-faces-unavailable.txt` et ne sont plus redemandées : l'appli leur garde le « ! » de quête. Une apparence modifiée par un patch est retentée ; supprimer le fichier les retente toutes.
 
 ### Publier une version
 

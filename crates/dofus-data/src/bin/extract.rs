@@ -1,5 +1,6 @@
 //! Extracts `data/world.json`, the map icons in `ui/icons/` and the boss portraits in `ui/icons/monster/`
-//! from a Dofus 3 install, then fetches the NPC faces missing from `ui/icons/npc/` from Ankama's renderer.
+//! from a Dofus 3 install, then fetches the NPC faces missing from `ui/icons/npc/` from Ankama's renderer
+//! (looks it cannot draw are listed in `npc-faces-unavailable.txt` next to the data file and skipped).
 //! Usage: `cargo run --release -p dofus-data --bin extract -- [<Dofus-dofus3 folder>] [--out <file>] [--icons <folder>]`
 
 use dofus_data::extract::{aa_bundle, content, default_game_dir, extract};
@@ -98,7 +99,8 @@ fn main() -> ExitCode {
         .filter(|n| !n.look.is_empty())
         .map(|n| n.look.clone())
         .collect();
-    match icons::fetch_faces(&looks, &icon_dir.join("npc")) {
+    let unavailable = out.with_file_name("npc-faces-unavailable.txt");
+    match icons::fetch_faces(&looks, &icon_dir.join("npc"), &unavailable) {
         Ok((n, failed)) => {
             println!(
                 "{} NPC faces ({n} fetched) -> {}",
